@@ -167,6 +167,7 @@ def computational_time()->None:
 
         i += 1
     
+    # plotting the results obtained
     fig, ax = plt.subplots(ncols = 2)
 
     ax[0].plot(dimensions, num_gradient, label = "Numerical Gradient", ls = "--", lw = 1)
