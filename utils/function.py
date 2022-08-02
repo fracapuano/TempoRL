@@ -1,3 +1,4 @@
+from copy import copy
 import numpy as np
 import time
 
@@ -30,7 +31,7 @@ def gradient(f, x:np.array, mode:str="f", h:float=1e-6)->np.array:
         """)
     
     mode = mode.lower()
-    if mode == "f": 
+    if mode == "f":  
         pass
     elif mode == "c": 
         pass
@@ -69,8 +70,10 @@ def hessian(f, x:np.array, h:float=np.sqrt(1e-6))->np.ndarray:
                 hess_fx[i, j] = (f(x + h*idn[:, i] + h*idn[:, j]) - fx_incrementOnI - fx_incrementOnJ + f(x))/h**2
     
     #DEBUG purposes: hess_comp_time = time.time() - start_time
-    
-    return hess_fx
 
-x_try = np.random.random(10)
-print(hessian(rosen, x_try))
+    # filling the submatrix using the upper one
+    hess_fx_copy = copy(hess_fx)
+    # filling the diagonal of the submatrix matrix with zeros
+    np.fill_diagonal(hess_fx_copy, 0)
+
+    return hess_fx + hess_fx_copy.T
