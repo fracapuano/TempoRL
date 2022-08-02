@@ -1,7 +1,9 @@
 from copy import copy
 import numpy as np
 import time
+from pyrsistent import m
 from scipy.optimize import rosen, rosen_der, rosen_hess
+import matplotlib.pyplot as plt
 
 def rosen(x: np.array):
     """
@@ -99,7 +101,6 @@ def hessian(f, x:np.array, h:float=np.sqrt(1e-8))->np.ndarray:
     return hess_fx + hess_fx_copy.T
 
 def test(n:int=10, n_test:int=10)->None: 
-
     """This function tests numeric approximation of hessian and gradient of the rosenbrock function using as reference solutions 
     the scipy implementation of gradient and hessian themselves. 
 
@@ -120,3 +121,69 @@ def test(n:int=10, n_test:int=10)->None:
 
     print(f"Avg gradient error: {grad_err.mean()}")
     print(f"Avg hessian multiplication herror: {hess_prod_err.mean()}")
+
+def computational_time()->None: 
+    """This function tests performance by means of computational time of basic numerical differentiation using as reference solutions 
+    the scipy implementation of gradient and hessian themselves. 
+
+    Args:
+        n_test (int, optional): Number of tests to carry out with different vectors for hessian product. Defaults to 10.
+    """
+    # different space dimensions to test
+    dimensions = [3, 10, 25, 50, 100]
+    
+    num_gradient = np.zeros(len(dimensions))
+    ex_gradient = np.zeros(len(dimensions))
+    num_hess = np.zeros(len(dimensions))
+    ex_hess = np.zeros(len(dimensions))
+
+    i = 0
+    for d in dimensions: 
+        
+        p_try = np.random.random(size = d)
+        # numerical gradient
+        s_time = time.time()
+        gradient(rosen, p_try)
+        computing_time = time.time() - s_time
+        num_gradient[i] = computing_time
+        
+        # exact gradient
+        s_time = time.time()
+        rosen_der(p_try)
+        computing_time = time.time() - s_time
+        ex_gradient[i] = computing_time
+        
+        # numerical hessian
+        s_time = time.time()
+        hessian(rosen, p_try)
+        computing_time = time.time() - s_time
+        num_hess[i] = computing_time
+
+        # exact hessian
+        s_time = time.time()
+        rosen_hess(p_try)
+        computing_time = time.time() - s_time
+        ex_hess[i] = computing_time
+
+        i += 1
+    
+    fig, ax = plt.subplots(ncols = 2)
+
+    ax[0].plot(dimensions, num_gradient, label = "Numerical Gradient", ls = "--", lw = 1)
+    ax[0].plot(dimensions, ex_gradient, label = "scipy Gradient", ls = "--", lw = 1)
+    ax[1].plot(dimensions, num_hess, label = "Numerical Hessian", ls = "--", lw = 1)
+    ax[1].plot(dimensions, ex_hess, label = "scipy Hessian", ls = "--", lw = 1)
+
+    ax[0].scatter(dimensions, num_gradient)
+    ax[0].scatter(dimensions, ex_gradient)
+    ax[1].scatter(dimensions, num_hess)
+    ax[1].scatter(dimensions, ex_hess)
+    
+    ax[0].legend()
+    ax[0].set_xticks(dimensions)
+    ax[0].set_yscale("log")
+    ax[1].legend()
+    ax[1].set_xticks(dimensions)
+    ax[1].set_yscale("log")
+
+    plt.show()
