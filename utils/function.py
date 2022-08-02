@@ -1,6 +1,7 @@
 from copy import copy
 import numpy as np
 import time
+from scipy.optimize import rosen, rosen_der, rosen_hess
 
 def rosen(x: np.array):
     """
@@ -30,13 +31,30 @@ def gradient(f, x:np.array, mode:str="f", h:float=1e-6)->np.array:
         Only these values are supported. Type "help(gradient)" in the command line for more information...
         """)
     
-    mode = mode.lower()
-    if mode == "f":  
-        pass
-    elif mode == "c": 
-        pass
+    fx = f(x)
+    n = x.shape[0]
+    idn = np.identity(n)
 
-def hessian(f, x:np.array, h:float=np.sqrt(1e-6))->np.ndarray:
+    grad_fx = np.zeros(shape = n)
+
+    mode = mode.lower()
+    # DEBUG purposes:
+    # start_time = time.time()
+
+    if mode == "f":  
+        for i in range(n): 
+            grad_fx[i] = (f(x + h*idn[:, i]) - fx)/h
+    elif mode == "c": 
+        for i in range(n): 
+            grad_fx[i] = (f(x + h*idn[:, i]) - f(x - h*idn[:, i]))/(2*h)
+
+    # DEBUG purposes: 
+    # grad_time = time.time() - start_time
+    # print(grad_time)
+
+    return grad_fx
+
+def hessian(f, x:np.array, h:float=np.sqrt(1e-8))->np.ndarray:
     """This function returns the hessian of "f" computed in "x"
 
     Args:
@@ -44,32 +62,34 @@ def hessian(f, x:np.array, h:float=np.sqrt(1e-6))->np.ndarray:
         x (np.array): The vector in which the function hessian should be obtained.
         h (float, optional):  The (small) scalar increment to be used in finite differentiation. The smaller h is the smaller the difference between numerical and
                              exact derivative gets. However, to a decrease in such "analytical error" corresponds an increase in "numerical error", so h should not
-                             get too small. Defaults to np.sqrt(1e-6) (since there is a squaring operation of the increment in numerical hessian).
+                             get too small. Defaults to np.sqrt(1e-8) (since there is a squaring operation of the increment in numerical hessian).
     Returns:
         np.ndarray: The hessian of "f" in "x", hess_f(x).
     """
     fx = f(x)
-
     n = x.shape[0]
+
     idn = np.identity(n)
     hess_fx = np.zeros_like(idn)
     
-    #DEBUG purposes: start_time = time.time()
+    # DEBUG purposes
+    # start_time = time.time()
 
     for i in range(n): 
         # to reduce the number of function evaluation
         fx_incrementOnI = f(x + h*idn[:, i])
         for j in range(i, n): 
             # to reduce the number of function evaluation
-            fx_incrementOnJ = f(x + h*idn[:,j])
-
+        
             if j == i: # diagonal elements
                 hess_fx[i, j] = (f(x + h*idn[:, i]) + f(x - h*idn[:, i]) - 2*fx)/h**2
 
             elif j != i: # off-diagonal elements
-                hess_fx[i, j] = (f(x + h*idn[:, i] + h*idn[:, j]) - fx_incrementOnI - fx_incrementOnJ + f(x))/h**2
+                hess_fx[i, j] = (f(x + h*idn[:, i] + h*idn[:, j]) - fx_incrementOnI - f(x + h*idn[:,j]) + f(x))/h**2
     
-    #DEBUG purposes: hess_comp_time = time.time() - start_time
+    # DEBUG purposes
+    # hess_time = time.time() - start_time
+    # print(hess_time)
 
     # filling the submatrix using the upper one
     hess_fx_copy = copy(hess_fx)
@@ -77,3 +97,26 @@ def hessian(f, x:np.array, h:float=np.sqrt(1e-6))->np.ndarray:
     np.fill_diagonal(hess_fx_copy, 0)
 
     return hess_fx + hess_fx_copy.T
+
+def test(n:int=10, n_test:int=10)->None: 
+
+    """This function tests numeric approximation of hessian and gradient of the rosenbrock function using as reference solutions 
+    the scipy implementation of gradient and hessian themselves. 
+
+    Args:
+        n (int, optional): Dimension of the space in which to conduct testing. Defaults to 10.
+        n_test (int, optional): Number of tests to carry out with different vectors for hessian product. Defaults to 10.
+    """
+    
+    hess_prod_err = np.zeros(n_test)
+    grad_err = np.zeros(n_test)
+
+    for i in range(n_test): 
+        p_try = np.random.random(n)
+        p_try_hess = np.random.random(n)
+
+        grad_err[i] = np.linalg.norm(rosen_der(p_try) - gradient(rosen, p_try))
+        hess_prod_err[i] = (np.linalg.norm((rosen_hess(p_try) - hessian(rosen, p_try)) @ p_try_hess))/np.linalg.norm(p_try_hess)
+
+    print(f"Avg gradient error: {grad_err.mean()}")
+    print(f"Avg hessian multiplication herror: {hess_prod_err.mean()}")
