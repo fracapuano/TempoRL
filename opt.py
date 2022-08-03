@@ -29,7 +29,7 @@ def find_alpha(
         maxit_wolfe (int, optional): Maximal number of iterations to verify strong Wolfe conditions. Defaults to 50.
 
     Returns:
-        float: _description_
+        float: optimal steplength according to line search
     """
     
     alpha_k = line_search(f, grad_f, xk, pk, maxiter = maxit_wolfe)[0]
