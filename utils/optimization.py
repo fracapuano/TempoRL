@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.linalg import norm
-from numerical_diff import *
+from utils.numerical_diff import *
 from scipy.optimize import line_search
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import gmres
@@ -87,8 +87,8 @@ def newton(
     grads = np.zeros(maxit)
 
     k = 0
-
     while k < maxit and grad_norm > tolgrad: 
+        it_time = time.time()
         hess_xk = hess_f(xk)
         grad_xk = grad_f(xk)
         grad_norm = norm(grad_xk)
@@ -99,6 +99,7 @@ def newton(
 
         xk = xk + alpha_k * pk
         k += 1
+        print("It {} - gradnorm {:.4e} - obtained in {} s".format(k, grad_norm, time.time()-it_time))
     
     # "cutting" grads to the correct shape
     grads = grads[:k]
