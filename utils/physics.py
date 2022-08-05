@@ -120,3 +120,24 @@ class Laser:
         pulse = self.temporal_profile()
         
         return pulse
+    
+    def target_pulse(self, num_points_increment:int=int(2e4), custom_target:bool=False)->None: 
+        """This function returns the target pulse shape in the temporal domain.
+
+        Args:
+            custom_target (bool, optional): Whether or not a custom target pulse shape has to be used. Defaults to False. In this case, the
+            shape corresponding to shortest possible pulse is used. 
+        """
+        if not custom_target: 
+            step = np.diff(self.frequency)[0]
+            sample_points = len(self.intensity) + num_points_increment
+            time = fftshift(fftfreq(sample_points, d=abs(step)))
+
+            # padding the spectral intensity and phase to increase sample complexity for the fft algorithm
+            spectral_intensity = np.pad(self.intensity, (num_points_increment//2, num_points_increment//2), "constant", constant_values = (0,0))
+            spectral_phase = np.zeros_like(spectral_intensity)
+            field = fftshift(fft(spectral_intensity * np.exp(1j * spectral_phase)))
+            
+            field_squaremodulus = np.real(field * np.conj(field)) # only for casting reasons
+
+            return field_squaremodulus/field_squaremodulus.max()
