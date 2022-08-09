@@ -25,7 +25,7 @@ def theorical_phase(frequency:np.array, central_carrier:float)->np.array:
     Returns:
         np.array: Theorical phase obtained considering the formula presented.
     """
-    GDD, TOD, FOD = 27, 40, 50
+    GDD, TOD, FOD = 30, 40, 50
     alpha_GDD, alpha_TOD, alpha_FOD = 25e3, 30e3, 50e3
 
     theorical_phase = \
@@ -68,6 +68,8 @@ class PulseEmitter:
         Returns:
             np.array: The time representation of the pulse. 
         """
+        self.npoints_increment = num_points
+
         spectrum_field = np.pad(self.field, (num_points//2, num_points//2), "constant", constant_values = (0,0))
         spec_phase = self.phase_reconstruction(control_params)
         spectrum_phase = np.pad(spec_phase, (num_points//2, num_points//2), "constant", constant_values = (0,0))
@@ -78,3 +80,14 @@ class PulseEmitter:
 
         return np.real(pulse / pulse.max())
 
+    def time_scale(self)->np.array:
+        """This function returns the time scale for the considered signal.
+
+        Returns:
+            np.array: Time scale of the signal (in femtoseconds)
+        """
+        step = np.diff(self.frequency)[0]
+        sample_points = len(self.intensity) + self.npoints_increment
+        time = fftshift(fftfreq(sample_points, d=abs(step)))
+
+        return time * 1e-15
