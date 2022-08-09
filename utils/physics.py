@@ -87,7 +87,7 @@ class PulseEmitter:
             np.array: Time scale of the signal (in femtoseconds)
         """
         step = np.diff(self.frequency)[0]
-        sample_points = len(self.intensity) + self.npoints_increment
+        sample_points = len(self.field) + self.npoints_increment
         time = fftshift(fftfreq(sample_points, d=abs(step)))
 
-        return time * 1e-15
+        return time * 1e15
