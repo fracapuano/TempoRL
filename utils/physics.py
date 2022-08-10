@@ -1,3 +1,5 @@
+from multiprocessing.sharedctypes import Value
+import re
 import numpy as np
 from scipy.fft import fft, fftfreq, fftshift
 
@@ -50,12 +52,33 @@ def phase_expansions(frequency:np.array, phase:np.array, degree:int=4)->np.array
     return control_params[::-1]
 
 class PulseEmitter: 
-    def __init__(self, frequency:np.array, field:np.array)->None: 
+    def __init__(self, frequency:np.array, field:np.array, useEquation:bool=False, central_carrier:float=None)->None: 
         self.frequency = frequency 
         self.field = field
+        self.useEquation = useEquation
+        
+        if self.useEquation: 
+            if central_carrier is None: 
+                raise ValueError("Central carrier needed if the phase is being reconstructed using an equation")
+            else: 
+                self.central_carrier = central_carrier
     
     def phase_reconstruction(self, control_params:np.array)->np.array: 
         return (self.frequency.reshape(-1,1) ** np.arange(start = 0, stop = len(control_params))) @ control_params
+
+    def phase_control(self, control_params:np.array)->np.array: 
+        if len(control_params)==3:
+            GDD, TOD, FOD = control_params 
+            alpha_GDD, alpha_TOD, alpha_FOD = 25e3, 30e3, 50e3
+        else: 
+            raise ValueError("Please use GDD, TOD and FOD only if constructing the phase starting from equation.")
+        
+        theorical_phase = \
+            (1/2)*(GDD*1000 - alpha_GDD)*1e-30*(2*np.pi*self.frequency - self.central_carrier)**2 + \
+            (1/6)*(TOD*1000-alpha_TOD)*1e-45*(2*np.pi*self.frequency - self.central_carrier)**3 + \
+            (1/24)*(FOD*1000 - alpha_FOD)*1e-60*(2*np.pi*self.frequency - self.central_carrier)**4
+    
+        return theorical_phase
 
     def temporal_profile(self, control_params:np.array, num_points:int=int(2e4))->np.array: 
         """This function returns the temporal profile of a signal described in frequency and electric field given the considered control parameters. 
@@ -71,7 +94,11 @@ class PulseEmitter:
         self.npoints_increment = num_points
 
         spectrum_field = np.pad(self.field, (num_points//2, num_points//2), "constant", constant_values = (0,0))
-        spec_phase = self.phase_reconstruction(control_params)
+        if self.useEquation: 
+            spec_phase = self.phase_control(control_params)
+        else: 
+            spec_phase = self.phase_reconstruction(control_params)
+            
         spectrum_phase = np.pad(spec_phase, (num_points//2, num_points//2), "constant", constant_values = (0,0))
         
         time_field = fftshift(fft(spectrum_field*np.exp(1j*spectrum_phase)))
