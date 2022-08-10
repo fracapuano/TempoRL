@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.linalg import norm
-from numerical_diff import *
+from utils.numerical_diff import *
 from scipy.optimize import minimize_scalar
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import gmres, cg
