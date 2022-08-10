@@ -1,9 +1,8 @@
 import numpy as np
 from numpy.linalg import norm
-from utils.numerical_diff import *
-from scipy.optimize import minimize_scalar
+from numerical_diff import *
 import matplotlib.pyplot as plt
-from scipy.sparse.linalg import gmres, cg
+from scipy.sparse.linalg import gmres
 from typing import Tuple
 
 def find_alpha(
@@ -93,7 +92,7 @@ def newton(
         grad_norm = norm(grad_xk)
         grads[k] = grad_norm
 
-        pk, _ = gmres(hess_xk, -grad_xk, maxit=gmres_maxit)     
+        pk, _ = gmres(hess_xk, -grad_xk, maxiter=gmres_maxit)     
         alpha_k = find_alpha(f, grad_f, xk, pk, c1=c1, alpha_0=alpha_0, rho=rho, maxit_bt=maxit_bt)
 
         xk = xk + alpha_k * pk
@@ -202,7 +201,7 @@ def plot_gradient_norm(dim:int=10):
         dim (int): Dimension of the space considered.
     """
     x_start = np.random.random(dim)
-    tolgrad = 1e-5
+    tolgrad = 1e-6
 
     print("Starting newton method...")
     start_time = time.time()
@@ -212,7 +211,7 @@ def plot_gradient_norm(dim:int=10):
 
     print("Starting PR+ method...")
     start_time = time.time()
-    x_pr, grads_pr = pr_plus(rosen, rosen_grad_handle, x_start, maxit_bt=10, rho=3e-1, alpha_0 = 1, tolgrad=tolgrad, verbose = 1)
+    x_pr, grads_pr = pr_plus(rosen, rosen_grad_handle, x_start, maxit_bt=10, rho=0.5, alpha_0 = 1, tolgrad=tolgrad, verbose = 1)
     completion = time.time() - start_time
     print("PR+ complete! (elapsed in {:.3f} s)".format(completion))
 
@@ -236,7 +235,7 @@ def plot_gradient_norm(dim:int=10):
     plt.show()
 
 def main(): 
-    plot_gradient_norm()
+    plot_gradient_norm(dim=2)
 
 if __name__ == "__main__": 
     main()
