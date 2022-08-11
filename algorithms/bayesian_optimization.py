@@ -7,7 +7,6 @@ Author: Francesco Capuano, ELI-beamlines intern, Summer 2022.
 import sys
 import os
 import inspect
-from turtle import pd
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
