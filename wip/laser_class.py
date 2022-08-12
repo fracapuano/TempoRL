@@ -16,8 +16,7 @@ def mse(x:np.array, y:np.array)->float:
     x, y = x.reshape(-1,), y.reshape(-1,)
     return ((x-y)**2).mean()
 
-class Laser: 
-
+class Laser:
     def __init__(self, frequency:np.array, intensity:np.array, cutoff_frequencies:np.array, syntetic_points:int=int(1e3))->None: 
         self.frequency = frequency
         self.intensity = intensity
