@@ -2,6 +2,7 @@
 This script reproduces a semi-physical model for a pump-laser. 
 Author: Francesco Capuano, Summer 2022 S17 Intern @ ELI beam-lines, Prague.
 """
+from utils.physics import *
 # these imports are necessary to import modules from directories one level back in the folder structure
 import sys
 import os
@@ -15,7 +16,6 @@ from typing import Tuple
 import numpy as np
 from scipy.constants import c
 from numpy.fft import fft, ifft, fftfreq, fftshift
-from physics import *
 
 class LaserModel: 
     def __init__(
@@ -33,7 +33,7 @@ class LaserModel:
         Args:
             frequency (np.array): Array of frequencies, measured in THz.
             intensity (np.array): Array of intensity (measured with respect to the frequency).
-            cutoff (Tuple[float, float]): The frequencies to be used as frequency cutoff.
+            cutoff (Tuple[float, float]): The frequencies to be used as frequency cutoff (in Hz).
             num_points (int, optional): Number of points that need to be syntetically generated in the cutoff[0]-cutoff[1] interval.
             num_points_padding (int, optional): Number of points to be used to pad. Defaults to int(1e4)
             at a given distante equal to (abs(cutoff[1]-cutoff[0])/num_points). Defaults to int(5e3).
@@ -41,10 +41,11 @@ class LaserModel:
             laser-characteristic and are not controlled, therefore are essentially speaking hyper-parameters to the process.
             B (float, optional): B-integral value. Used to model the non-linear effects that DIRA has on the beam.
         """
-        self.frequency = frequency
+        self.frequency = frequency * 10 ** 12 # THz to Hz
         self.field = np.sqrt(intensity) # electric field is the square root of intensity
+        self.preprocessed = False
         # parametrization of the preprocessing step
-        self.cutoff = cutoff
+        self.cutoff = cutoff * 10 ** 12
         self.num_points = num_points
         self.pad_points = num_points_padding
         # number of points to be used in padding 
@@ -55,12 +56,17 @@ class LaserModel:
     def preprocessing(self):
         """This function applies necessary preprocessing steps to the spectrum of the laser.
         """
-        # cleaning the signal (cutting off the parts which are affected by measurement issues)
-        self.frequency, self.field = cutoff_signal(frequency_cutoff = self.cutoff, frequency=self.frequency, signal = self.field)
-        # obtaining num_points equally distant measurements
-        self.frequency, self.field = equidistant_points(frequency = self.frequency, signal = self.field, num_points = self.num_points)
-        # computing the central carrier of the signal
-        self.central_frequency = central_frequency(frequency = self.frequency, signal = self.field)
+        if not self.preprocessed: # pre-processing only if necessary
+            # cleaning the signal (cutting off the parts which are affected by measurement issues)
+            self.frequency, self.field = cutoff_signal(frequency_cutoff = self.cutoff, frequency=self.frequency, signal = self.field)
+            # obtaining num_points equally distant measurements
+            self.frequency, self.field = equidistant_points(frequency = self.frequency, signal = self.field, num_points = self.num_points)
+            # computing the central carrier of the signal
+            self.central_frequency = central_frequency(frequency = self.frequency, signal = self.field)
+            # preprocessing complete
+            self.preprocessed = True
+        else: 
+            pass
     
     def stretcher(self, control:np.array) -> np.array:
         """This function imposes a phase on frequency-represented intensity according to control parameters. Control parameters relate to 
@@ -86,7 +92,7 @@ class LaserModel:
         # linear systems of equations that links control parameters to the phase parametrization
         a11 = (-2 * np.pi * c)/(central_wavelength ** 2) #; a12 = a13 = 0
         a21 = (4 * np.pi * c)/(central_wavelength ** 3); a22 = ((2 * np.pi * c)/(central_wavelength ** 2))**2 # a23 = 0
-        a31 = (-12 * np.pi * c)/(central_wavelength ** 4); a32 = (-24 * (np.pi * c) ** 2)/(central_wavelength ** 5); a33 = ((2 * np.pi * c) / (central_wavelength ** 2)) ** 3
+        a31 = (-12 * np.pi * c)/(central_wavelength ** 4); a32 = (-24 * (np.pi * c) ** 2)/(central_wavelength ** 5); a33 = -((2 * np.pi * c) / (central_wavelength ** 2)) ** 3
 
         # solving the conversion system using forward substitution
         GDD = d2 / a11; TOD = (d3 - a21 * GDD)/(a22); FOD = (d4 - a31 * GDD - a32 * TOD)/(a33)

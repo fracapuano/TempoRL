@@ -21,7 +21,7 @@ def cutoff_signal(frequency_cutoff:Tuple[float, float], frequency:np.array, sign
     if low_f >= up_f: # check on consistency
         raise ValueError("frequency_cutoff must be a tuple of strictly increasing values.")
     
-    low_idx, right_idx = np.argwhere(frequency >= low_f)[0].item(), np.argwhere(frequency <= up_f)[-1].item()
+    low_idx, right_idx = np.argwhere(frequency >= low_f)[0], np.argwhere(frequency <= up_f)[-1]
     return frequency[low_idx:right_idx+1], signal[low_idx:right_idx+1]
 
 def equidistant_points(frequency:np.array, signal:np.array, num_points:int=int(5e3)) -> Tuple[np.array, np.array]: 
@@ -46,7 +46,7 @@ def central_frequency(frequency:np.array, signal:np.array) -> float:
     maximum.
 
     Args:
-        frequency (np.array): Array of frequencies, measured in THz.
+        frequency (np.array): Array of frequencies, measured in Hz.
         signal (np.array): The signal of interest (represented in the frequency domain).
 
     Returns:
