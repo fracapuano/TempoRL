@@ -24,7 +24,7 @@ class LaserModel:
         intensity:np.array, 
         cutoff:Tuple[float, float], 
         num_points:int=int(5e3), 
-        num_points_padding:int=int(2e4), 
+        num_points_padding:int=int(6e4), 
         compressor_params:Tuple[float, float, float]=(1e3, 1e3, 1e3), 
         B:float=2) -> None:
         """Init function. 
@@ -35,7 +35,7 @@ class LaserModel:
             intensity (np.array): Array of intensity (measured with respect to the frequency).
             cutoff (Tuple[float, float]): The frequencies to be used as frequency cutoff (in Hz).
             num_points (int, optional): Number of points that need to be syntetically generated in the cutoff[0]-cutoff[1] interval.
-            num_points_padding (int, optional): Number of points to be used to pad. Defaults to int(1e4)
+            num_points_padding (int, optional): Number of points to be used to pad. Defaults to int(6e4)
             at a given distante equal to (abs(cutoff[1]-cutoff[0])/num_points). Defaults to int(5e3).
             compressor_params (Tuple[float, float, float]): Compressor GDD, TOD and FOD. These are considered.
             laser-characteristic and are not controlled, therefore are essentially speaking hyper-parameters to the process.
@@ -109,7 +109,7 @@ class LaserModel:
         Returns:
             np.array: y2, intensity in the frequency domain considering DIRA.
         """
-        y1_time = (ifft(self.y1))
+        y1_time = ifft(self.y1)
         intensity_time = ((y1_time*np.conj(y1_time)))**2
         intensity_0 = intensity_time.max()
         nonlinear_phase = (self.B / intensity_0) * intensity_time
@@ -168,20 +168,3 @@ class LaserModel:
         # obtaining FROG in time
         time, self.y3_time = self.FROG()
         return time, self.y3_time
-    
-    def transform_limited(self) -> np.array: 
-        """This function returns the transform limited temporal profile of the input spectrum.
-
-        Returns:
-            np.array: Temporal profile of the Transform Limited pulse.
-        """
-        time = fftshift(fftfreq(n = len(self.y3), d = np.diff(self.frequency)[0]))
-
-        # padding the spectral intensity and phase to increase sample complexity for the fft algorithm
-        pad_field = np.pad(self.field, pad_width = (self.pad_points // 2, self.pad_points // 2), mode = "constant", constant_values = (0, 0))
-        field_time = fftshift(ifft(pad_field))
-        
-        intensity_time = np.real(field_time * np.conj(field_time)) # only for casting reasons
-        intensity_time = intensity_time / intensity_time.max() # normalizing intensity
-
-        return time, intensity_time
