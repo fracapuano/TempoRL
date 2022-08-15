@@ -24,7 +24,7 @@ class LaserModel:
         intensity:np.array, 
         cutoff:Tuple[float, float], 
         num_points:int=int(5e3), 
-        num_points_padding:int=int(1e4), 
+        num_points_padding:int=int(2e4), 
         compressor_params:Tuple[float, float, float]=(1e3, 1e3, 1e3), 
         B:float=2) -> None:
         """Init function. 
@@ -45,7 +45,7 @@ class LaserModel:
         self.field = np.sqrt(intensity) # electric field is the square root of intensity
         self.preprocessed = False
         # parametrization of the preprocessing step
-        self.cutoff = cutoff * 10 ** 12
+        self.cutoff = np.array(cutoff) * 10**12
         self.num_points = num_points
         self.pad_points = num_points_padding
         # number of points to be used in padding 
@@ -144,7 +144,7 @@ class LaserModel:
         intensity_time = np.real(field_time * np.conj(field_time)) # only for casting reasons
         intensity_time = intensity_time / intensity_time.max() # normalizing intensity
 
-        return intensity_time
+        return time, intensity_time
 
     def forward_pass(self, control:np.array) -> np.array: 
         """This function performs a forward pass in the model using control values stored in control.
@@ -166,4 +166,22 @@ class LaserModel:
         # padding y3 with zeros on the tails (to increase fft algorithm precision)
         self.y3 = np.pad(self.y3, pad_width = (self.pad_points // 2, self.pad_points // 2), mode = "constant", constant_values = (0, 0))
         # obtaining FROG in time
-        return self.FROG()
+        time, self.y3_time = self.FROG()
+        return time, self.y3_time
+    
+    def transform_limited(self) -> np.array: 
+        """This function returns the transform limited temporal profile of the input spectrum.
+
+        Returns:
+            np.array: Temporal profile of the Transform Limited pulse.
+        """
+        time = fftshift(fftfreq(n = len(self.y3), d = np.diff(self.frequency)[0]))
+
+        # padding the spectral intensity and phase to increase sample complexity for the fft algorithm
+        pad_field = np.pad(self.field, pad_width = (self.pad_points // 2, self.pad_points // 2), mode = "constant", constant_values = (0, 0))
+        field_time = fftshift(ifft(pad_field))
+        
+        intensity_time = np.real(field_time * np.conj(field_time)) # only for casting reasons
+        intensity_time = intensity_time / intensity_time.max() # normalizing intensity
+
+        return time, intensity_time

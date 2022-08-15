@@ -2,6 +2,8 @@ import numpy as np
 from typing import Tuple
 from scipy.interpolate import UnivariateSpline
 
+import matplotlib.pyplot as plt
+
 def cutoff_signal(frequency_cutoff:Tuple[float, float], frequency:np.array, signal:np.array) -> Tuple[np.array, np.array]:
     """This function cuts the input signal using input frequency cutoff. It returns the cutted signal. The cut is done so as to discard
     from the analysis the part of the signal which is non-zero only for measurement noise.
@@ -20,9 +22,8 @@ def cutoff_signal(frequency_cutoff:Tuple[float, float], frequency:np.array, sign
     low_f, up_f = frequency_cutoff
     if low_f >= up_f: # check on consistency
         raise ValueError("frequency_cutoff must be a tuple of strictly increasing values.")
-    
-    low_idx, right_idx = np.argwhere(frequency >= low_f)[0], np.argwhere(frequency <= up_f)[-1]
-    return frequency[low_idx:right_idx+1], signal[low_idx:right_idx+1]
+    left_idx, right_idx = np.argwhere(frequency >= low_f)[0].item(), np.argwhere(frequency <= up_f)[-1].item()
+    return frequency[left_idx:right_idx+1], signal[left_idx:right_idx+1]
 
 def equidistant_points(frequency:np.array, signal:np.array, num_points:int=int(5e3)) -> Tuple[np.array, np.array]: 
     """This function uses a spline to interpolate the input signal so as to be able to reproduce it for
@@ -53,7 +54,7 @@ def central_frequency(frequency:np.array, signal:np.array) -> float:
         float: Central (not angular) frequency. 
     """
     half_max = signal.max() / 2
-    spline = UnivariateSpline(sorted(frequency), signal - half_max, s = 0) # use all the points available
+    spline = UnivariateSpline(frequency, signal - half_max, s = 0) # use all the points available   
     left_freq, right_freq = spline.roots().min(), spline.roots().max()
     # returns central frequency (in Hz, not angular)
     return abs(left_freq + right_freq)/2
