@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.fft import fft, ifft, fftfreq, fftshift
 from typing import Tuple
 from scipy.interpolate import UnivariateSpline
 
@@ -74,9 +75,9 @@ def phase_equation(frequency:np.array, central_frequency:float, GDD:float, TOD:f
         np.array: The phase with respect to the frequency, measured in radiants.
     """
     phase = \
-            (1/2)* GDD * 1e-30 * (2*np.pi * (frequency - central_frequency))**2 + \
-            (1/6)* TOD * 1e-45 * (2*np.pi * (frequency - central_frequency))**3 + \
-            (1/24)* FOD * 1e-60 * (2*np.pi * (frequency - central_frequency))**4
+            (1/2)* GDD * (2*np.pi * (frequency - central_frequency))**2 + \
+            (1/6)* TOD * (2*np.pi * (frequency - central_frequency))**3 + \
+            (1/24)* FOD * (2*np.pi * (frequency - central_frequency))**4
     return phase
 
 def mse(x:np.array, y:np.array)->float: 
@@ -91,3 +92,34 @@ def mse(x:np.array, y:np.array)->float:
     """
     x, y = x.reshape(-1,), y.reshape(-1,)
     return ((x-y)**2).mean()
+
+def temporal_profile(frequency:np.array, field:np.array, phase:np.array, npoints_pad:int=int(1e4), return_time:bool=True) -> Tuple[np.array, np.array]:
+    """This function returns the temporal profile of a given signal considering the signal itself (in the frequency domain) and a given phase. 
+    Padding is added so as to have more points and increase FFT algorithm output's quality. 
+
+    Args:
+        frequency (np.array): Array of frequencies considered (measured in Hz)
+        field (np.array): Array of field measured in the frequency domain. 
+        phase (np.array): Array representing the phase considered in the frequency domain. 
+        npoints_pad (int, optional): Number of points to be used in padding. Padding will be applied using half of this value on the
+        right and half on the left. Defaults to int(1e4).
+        return_time (bool, optional): Whether or not to return also the time frame of the signal to be used on the x-axis. Defaults to True. 
+    Returns:
+        Tuple[np.array, np.array]: Returns either (time, intensity) (with time measured in in femtoseconds) or intensity only.
+    """
+    step = np.diff(frequency)[0]
+    time = fftshift(fftfreq(len(frequency) + npoints_pad, d=abs(step)))
+
+    field_padded = np.pad(field, pad_width=(npoints_pad // 2, npoints_pad // 2), mode = "constant", constant_values = (0, 0))
+    phase_padded = np.pad(phase, pad_width=(npoints_pad // 2, npoints_pad // 2), mode = "constant", constant_values = (0, 0))
+
+    field_time = fftshift(fft(field_padded * np.exp(1j * phase_padded))) # inverse FFT to go from frequency domain to temporal domain
+    intensity_time = np.real(field_time * np.conj(field_time)) # only for casting reasons
+
+    intensity_time = intensity_time / intensity_time.max() # normalizing
+    
+    # either returning time or not according to return_time
+    if not return_time: 
+        return intensity_time
+    else: 
+        return time, intensity_time

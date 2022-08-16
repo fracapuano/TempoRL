@@ -2,6 +2,7 @@
 This script reproduces a semi-physical model for a pump-laser. 
 Author: Francesco Capuano, Summer 2022 S17 Intern @ ELI beam-lines, Prague.
 """
+from dataclasses import field
 from utils.physics import *
 # these imports are necessary to import modules from directories one level back in the folder structure
 import sys
@@ -23,8 +24,8 @@ class LaserModel:
         frequency:np.array,
         intensity:np.array, 
         cutoff:Tuple[float, float], 
-        num_points:int=int(5e3), 
-        num_points_padding:int=int(6e4), 
+        num_points:int=int(2.5e3), 
+        num_points_padding:int=int(3e4), 
         compressor_params:Tuple[float, float, float]=(1e3, 1e3, 1e3), 
         B:float=2) -> None:
         """Init function. 
@@ -52,6 +53,8 @@ class LaserModel:
         # hyperparameters - LASER parametrization
         self.compressorGDD, self.compressorTOD, self.compressorFOD = compressor_params
         self.B = B
+        # storing the original input
+        self.input_frequency, self.input_field = frequency * 10 ** 12, np.sqrt(intensity)
         
     def preprocessing(self):
         """This function applies necessary preprocessing steps to the spectrum of the laser.
@@ -68,6 +71,60 @@ class LaserModel:
         else: 
             pass
     
+    def spit_center(self): 
+        """This function returns the frequency and electric field after preprocessing steps only.
+        """
+        f, e = cutoff_signal(frequency_cutoff = self.cutoff, frequency=self.input_frequency, signal = self.input_field)
+        f, e = equidistant_points(f, e, num_points = self.num_points)
+        return f, e
+    
+    def transform_limited(self): 
+        """This function returns the transform limited version of the input signal.
+        """
+        frequency, field = self.spit_center()
+        phase = np.zeros_like(frequency)
+        time, intensity_TL = temporal_profile(frequency = frequency, field = field, phase = phase, npoints_pad = self.pad_points, return_time=True)
+        return time, intensity_TL
+
+    def get_field(self): 
+        return self.field
+    
+    def get_frequency(self): 
+        return self.frequency
+    
+    def translate_control(self, control:np.array, verse:str = "to_gdd")->np.array: 
+        """This function translates the control quantities from Dispersion coefficients (the di's) to GDD, TOD and FOD using a system of linear equations 
+        defined for this very scope. 
+
+        Args:
+            control (np.array): Control quanitities (the di's). Must be used in SI units.
+            verse (str, optional): "to_gdd" to translate control from di's to (GDD, TOD and FOD), solving Ax = b. "to_disp" to translate (GDD, TOD and FOD)
+            to translate this control to the di's.
+
+        Returns:
+            np.array: The control translated according to the verse considered.
+        """
+         # central wavelength (using c/f = lambda, of course)
+        central_wavelength = c / self.central_frequency
+
+        a11 = (-2 * np.pi * c)/(central_wavelength ** 2) #; a12 = a13 = 0
+        a21 = (4 * np.pi * c)/(central_wavelength ** 3); a22 = ((2 * np.pi * c)/(central_wavelength ** 2))**2 # a23 = 0
+        a31 = (-12 * np.pi * c)/(central_wavelength ** 4); a32 = -(24 * (np.pi * c) ** 2)/(central_wavelength ** 5); a33 = -((2 * np.pi * c) / (central_wavelength ** 2)) ** 3
+
+        A = np.array([
+            [a11, 0, 0], 
+            [a21, a22, 0], 
+            [a31, a32, a33]
+        ])
+
+        if verse.lower() == "to_gdd": 
+            return np.linalg.solve(A, control)
+        elif verse.lower() == "to_disp": 
+            return A @ control
+        else: 
+            raise ValueError('Control translatin is either "to_gdd" or "to_disp"!')
+
+
     def stretcher(self, control:np.array) -> np.array:
         """This function imposes a phase on frequency-represented intensity according to control parameters. Control parameters relate to 
         those which actually control the phase with a system of linear equations whose solution is actually at the vector parametrizing the
@@ -92,7 +149,7 @@ class LaserModel:
         # linear systems of equations that links control parameters to the phase parametrization
         a11 = (-2 * np.pi * c)/(central_wavelength ** 2) #; a12 = a13 = 0
         a21 = (4 * np.pi * c)/(central_wavelength ** 3); a22 = ((2 * np.pi * c)/(central_wavelength ** 2))**2 # a23 = 0
-        a31 = (-12 * np.pi * c)/(central_wavelength ** 4); a32 = (-24 * (np.pi * c) ** 2)/(central_wavelength ** 5); a33 = -((2 * np.pi * c) / (central_wavelength ** 2)) ** 3
+        a31 = (-12 * np.pi * c)/(central_wavelength ** 4); a32 = -(24 * (np.pi * c) ** 2)/(central_wavelength ** 5); a33 = -((2 * np.pi * c) / (central_wavelength ** 2)) ** 3
 
         # solving the conversion system using forward substitution
         GDD = d2 / a11; TOD = (d3 - a21 * GDD)/(a22); FOD = (d4 - a31 * GDD - a32 * TOD)/(a33)
