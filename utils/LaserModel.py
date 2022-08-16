@@ -167,7 +167,7 @@ class LaserModel:
             np.array: y2, intensity in the frequency domain considering DIRA.
         """
         y1_time = ifft(self.y1)
-        intensity_time = ((y1_time*np.conj(y1_time)))**2
+        intensity_time = (y1_time*np.conj(y1_time))
         intensity_0 = intensity_time.max()
         nonlinear_phase = (self.B / intensity_0) * intensity_time
 
