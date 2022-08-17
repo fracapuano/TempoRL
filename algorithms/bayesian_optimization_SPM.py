@@ -96,9 +96,9 @@ def main()->None:
     
     # these are the bounds for the parameter currently optimized. 
     # These are specific for the actual laser rather than being specific for the signal.
-    d2_low, d2_high = -250, +250
-    d3_low, d3_high = -250, +250
-    d4_low, d4_high = -250, +250
+    d2_low, d2_high = -20, +20 #ps/nm
+    d3_low, d3_high = -20, +20 #ps/(nm^2) 
+    d4_low, d4_high = -20, +20 #ps/(nm^3)
 
     pbounds = {
         "d2": (d2_low, d2_high), 
@@ -114,7 +114,7 @@ def main()->None:
     )
     
     # these are hyperparameters of the optimization process
-    n_init, n_iter = 350, 500
+    n_init, n_iter = 100, 150
     optimizer.maximize(
         init_points=n_init,
         n_iter=n_iter,
@@ -134,7 +134,7 @@ def main()->None:
     ax.set_xlabel(r"Time ($10^{-12}$ s)"); ax.set_ylabel("Intensity")
 
     ax.legend()
-    #ax.set_xlim(left = -400, right = +400)
+    #ax.set_xlim(left = -0.05e-11, right = +0.05e-11)
     fig.tight_layout()
     plt.show()
 
