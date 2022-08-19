@@ -21,23 +21,6 @@ from utils import physics
 from utils import LaserModel as LM
 from scipy.constants import c 
 
-
-def convert_control(control:np.array) -> np.array: 
-    """This function converts the control from SI units to ps/nm, ps/nm^2 and ps/nm^3. 
-
-    Args:
-        control (np.array): The control applied in SI units. 
-
-    Returns:
-        np.array: The control applied in ps/nm, ps/nm^2 and ps/nm^3.
-    """
-    d2, d3, d4 = control
-    d2_new = d2 * 1e-3 # from s/m to ps/nm
-    d3_new = d3 * 1e+6 # from s/(m^2) to ps/(nm^2)
-    d4_new = d4 * 1e+15 # from s/(m^3) to ps/(nm^3)
-
-    return np.array((d2_new, d3_new, d4_new))
-
 def extract_data()->Tuple[np.array, np.array]: 
     """This function extracts the desired information from the data file given.
     
