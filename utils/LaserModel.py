@@ -27,7 +27,9 @@ class LaserModel:
         num_points:int=int(2.5e3), 
         num_points_padding:int=int(3e4), 
         compressor_params:Tuple[float, float, float]=(1e3, 1e3, 1e3), 
-        B:float=2) -> None:
+        B:float=2, 
+        cristal_frequency:np.array=np.ones(int(2.5e3)), 
+        cristal_intensity:np.array=np.ones(int(2.5e3))) -> None:
         """Init function. 
         This model is initialized for a considered intensity in the frequency domain signal.
 
@@ -41,6 +43,8 @@ class LaserModel:
             compressor_params (Tuple[float, float, float]): Compressor GDD, TOD and FOD. These are considered.
             laser-characteristic and are not controlled, therefore are essentially speaking hyper-parameters to the process.
             B (float, optional): B-integral value. Used to model the non-linear effects that DIRA has on the beam.
+            cristal_frequency (np.array, optional): Frequency (THz) of the amplification in the non-linear cristal at the beginning of DIRA.
+            cristal_intensity (np.array, optional): Intensity of the amplification in the non-linear cristal at the beginning of DIRA.
         """
         self.frequency = frequency * 10 ** 12 # THz to Hz
         self.field = np.sqrt(intensity) # electric field is the square root of intensity
@@ -55,7 +59,10 @@ class LaserModel:
         self.B = B
         # storing the original input
         self.input_frequency, self.input_field = frequency * 10 ** 12, np.sqrt(intensity)
-        
+        # YB:Yab gain
+        self.yb_frequency = cristal_frequency * 1e12 # THz to Hz
+        self.yb_field = np.sqrt(cristal_intensity)
+
     def preprocessing(self):
         """This function applies necessary preprocessing steps to the spectrum of the laser.
         """
@@ -124,7 +131,6 @@ class LaserModel:
         else: 
             raise ValueError('Control translatin is either "to_gdd" or "to_disp"!')
 
-
     def stretcher(self, control:np.array) -> np.array:
         """This function imposes a phase on frequency-represented intensity according to control parameters. Control parameters relate to 
         those which actually control the phase with a system of linear equations whose solution is actually at the vector parametrizing the
@@ -158,6 +164,36 @@ class LaserModel:
         
         # imposing the phase on the actual field considered
         return self.field * np.exp(1j * controlled_phase)
+
+    def amplification(self, n_passes:int=50) -> np.array: 
+        """This function reproduces the effect that passing through a non-linear cristal has on the beam itself. In particular, this function applies
+        the modification present in data/cristal_gain.txt to the spectrum coming out of the spectrum effectively modifying it. 
+
+        Args:
+            n_passes (int, optional): Number of passes through the non linear cristal.
+
+        Returns:
+            np.array: The field in the laser (\tilde{y}_1), which is the result of the spectrum modification carried out in the non linear cristal.
+        """
+        # cutting the gain frequency accordingly
+        yb_frequency, yb_field = cutoff_signal(
+            frequency_cutoff=(self.frequency[0], self.frequency[-1]), 
+            frequency = self.yb_frequency, 
+            signal = self.yb_field)
+        
+        # augmenting the cutted data
+        yb_frequency, yb_field = equidistant_points(
+            frequency = yb_frequency, 
+            signal = yb_field, 
+            num_points = self.num_points
+        )
+        
+        amp_field = yb_field * self.y1
+
+        for _ in range(1, n_passes): 
+            amp_field *=  yb_field
+        
+        return amp_field
 
     def DIRA(self) -> np.array: 
         """This function applies a non linear phase on the signal considered according to a parametrized
@@ -217,7 +253,11 @@ class LaserModel:
         # obtaining y1
         self.y1 = self.stretcher(control = control)
         # obtaining y2 
-        self.y2 = self.DIRA()
+        if self.B != 0: # linear effect
+            self.y1 = self.amplification()
+            self.y2 = self.DIRA()
+        else: 
+            self.y2 = self.y1 # no non-linear effect
         # obtaining y3
         self.y3 = self.compressor()
         # padding y3 with zeros on the tails (to increase fft algorithm precision)
