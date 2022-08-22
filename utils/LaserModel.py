@@ -16,6 +16,7 @@ sys.path.insert(0, parentdir)
 from typing import Tuple
 import numpy as np
 from scipy.constants import c
+import pandas as pd
 from numpy.fft import fft, ifft, fftfreq, fftshift
 
 class LaserModel: 
@@ -28,8 +29,8 @@ class LaserModel:
         num_points_padding:int=int(3e4), 
         compressor_params:Tuple[float, float, float]=(1e3, 1e3, 1e3), 
         B:float=2, 
-        cristal_frequency:np.array=np.ones(int(2.5e3)), 
-        cristal_intensity:np.array=np.ones(int(2.5e3))) -> None:
+        cristal_frequency:np.array=None, 
+        cristal_intensity:np.array=None) -> None:
         """Init function. 
         This model is initialized for a considered intensity in the frequency domain signal.
 
@@ -43,8 +44,8 @@ class LaserModel:
             compressor_params (Tuple[float, float, float]): Compressor GDD, TOD and FOD. These are considered.
             laser-characteristic and are not controlled, therefore are essentially speaking hyper-parameters to the process.
             B (float, optional): B-integral value. Used to model the non-linear effects that DIRA has on the beam.
-            cristal_frequency (np.array, optional): Frequency (THz) of the amplification in the non-linear cristal at the beginning of DIRA.
-            cristal_intensity (np.array, optional): Intensity of the amplification in the non-linear cristal at the beginning of DIRA.
+            cristal_frequency (np.array, optional): Frequency (THz) of the amplification in the non-linear cristal at the beginning of DIRA. Defaults to None.
+            cristal_intensity (np.array, optional): Intensity of the amplification in the non-linear cristal at the beginning of DIRA. Defaults to None.
         """
         self.frequency = frequency * 10 ** 12 # THz to Hz
         self.field = np.sqrt(intensity) # electric field is the square root of intensity
@@ -60,9 +61,21 @@ class LaserModel:
         # storing the original input
         self.input_frequency, self.input_field = frequency * 10 ** 12, np.sqrt(intensity)
         # YB:Yab gain
-        self.yb_frequency = cristal_frequency * 1e12 # THz to Hz
-        self.yb_field = np.sqrt(cristal_intensity)
+        if cristal_intensity is not None and cristal_frequency is not None: 
+            self.yb_frequency = cristal_frequency * 1e12 # THz to Hz
+            self.yb_field = np.sqrt(cristal_intensity)
+        else: 
+            # reading the data with which to amplify the signal when non specific one is given
+            cristal_path = "../data/cristal_gain.txt"
+            gain_df = pd.read_csv(cristal_path, sep = "  ", skiprows = 2, header = None, engine = "python")
 
+            gain_df.columns = ["Wavelength (nm)", "Intensity"]
+            gain_df.Intensity = gain_df.Intensity / gain_df.Intensity.values.max()
+            gain_df["Frequency (THz)"] = gain_df["Wavelength (nm)"].apply(lambda wl: 1e12 * (c/((wl+1) * 1e-9))) # 1nm shift
+
+            gain_df.sort_values(by = "Frequency (THz)", inplace = True)
+            self.yb_frequency, self.yb_field = gain_df["Frequency (THz)"].values, np.sqrt(gain_df["Intensity"].values)
+        
     def preprocessing(self):
         """This function applies necessary preprocessing steps to the spectrum of the laser.
         """
@@ -178,7 +191,7 @@ class LaserModel:
         # cutting the gain frequency accordingly
         yb_frequency, yb_field = cutoff_signal(
             frequency_cutoff=(self.frequency[0], self.frequency[-1]), 
-            frequency = self.yb_frequency, 
+            frequency = self.yb_frequency * 1e-12, 
             signal = self.yb_field)
         
         # augmenting the cutted data
