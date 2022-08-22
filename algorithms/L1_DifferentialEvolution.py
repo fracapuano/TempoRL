@@ -108,6 +108,7 @@ def objective_function(x,):
     _, profile_TL = physics.temporal_profile(frequency_clean, np.sqrt(intensity_clean), phase = np.zeros_like(frequency_clean), npoints_pad = l1_pump.pad_points)
     d2, d3, d4 = x
     temporal_profile = l1_pump.forward_pass(np.array((d2, d3, d4)))[1]
+    temporal_profile = np.roll(temporal_profile, np.argmax(temporal_profile) - np.argmax(profile_TL))
     return physics.mse(temporal_profile, profile_TL)
 
 def initial_guess(): 
@@ -168,7 +169,7 @@ def main()->None:
     ax.set_xlabel(r"Time (s)"); ax.set_ylabel("Intensity")
 
     ax.legend()
-    # ax.set_xlim(left = -0.05e-11, right = +0.05e-11)
+    ax.set_xlim(left = -0.1e-11, right = +0.1e-11)
     fig.tight_layout()
     plt.show()
 
