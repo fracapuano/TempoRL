@@ -63,7 +63,7 @@ def model(frequency, intensity, compressor, b_int, cutoff)->object:
 
 def main()->None: 
     frequency, intensity = extract_data() # extracting the desired information
-    COMPRESSOR = np.array((267.422 * 1e-24, -2.384 * 1e-36, 9.54893 * 1e-50)) # in s^2, s^3 and s^4 (SI units)
+    COMPRESSOR = -1 * np.array((267.422 * 1e-24, -2.384 * 1e-36, 9.54893 * 1e-50)) # in s^2, s^3 and s^4 (SI units)
     B = 2
     CUTOFF = (289.95, 291.91) # cutoff frequencies, in THz
 
@@ -128,7 +128,7 @@ def main()->None:
     ax.set_xlabel(r"Time (s)"); ax.set_ylabel("Intensity")
 
     ax.legend()
-    ax.set_xlim(left = -0.05e-11, right = +0.05e-11)
+    ax.set_xlim(left = -0.5e-11, right = +0.5e-11)
     fig.tight_layout()
     plt.show()
 

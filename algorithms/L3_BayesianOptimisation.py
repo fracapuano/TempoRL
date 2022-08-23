@@ -20,9 +20,9 @@ from utils import physics
 from scipy.interpolate import interp1d
 
 def main()->None: 
-    filename = "LLNL_160809_freq.csv"
+    filename = "data/LLNL_160809_freq.csv"
     os.chdir("..") # one folder back in the folder structure
-    df = pd.read_csv("data/"+filename, header = None)
+    df = pd.read_csv(filename, header = None)
     df.columns = ["Frequency (in THz)", "Wavelength (in nm)", "Intensity", "Phase (rad)", "Phase (cutted) (rad)"] 
 
     frequency = df.loc[:, "Frequency (in THz)"].values * 10**12 # THz to Hz
