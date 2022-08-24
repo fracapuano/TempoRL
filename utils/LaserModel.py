@@ -17,7 +17,7 @@ from typing import Tuple
 import numpy as np
 from scipy.constants import c
 import pandas as pd
-from numpy.fft import fft, ifft, fftfreq, fftshift
+from numpy.fft import fft, ifft, fftfreq, fftshift, ifftshift
 
 class LaserModel: 
     def __init__(
@@ -242,10 +242,10 @@ class LaserModel:
         return self.y2 * np.exp(1j * compressor_phase)
     
     def FROG(self) -> np.array: 
-        time = fftshift(fftfreq(n = len(self.y3), d = np.diff(self.frequency)[0]))
+        time = ifftshift(fftfreq(n = len(self.y3), d = np.diff(self.frequency)[0]))
 
         # padding the spectral intensity and phase to increase sample complexity for the fft algorithm
-        field_time = fftshift(ifft(self.y3))
+        field_time = ifftshift(ifft(ifftshift(self.y3)))
         
         intensity_time = np.real(field_time * np.conj(field_time)) # only for casting reasons
         intensity_time = intensity_time / intensity_time.max() # normalizing intensity
