@@ -100,12 +100,14 @@ def temporal_profile(frequency:torch.tensor, field:torch.tensor, npoints_pad:int
     step = torch.diff(frequency)[0]
     # centering the array in its peak
     time = torch.fft.fftshift(torch.fft.fftfreq(len(frequency) + npoints_pad, d=abs(step)))
-    # centering the signal in its peak
-    intensity_frequency = field * torch.conj(field) # only for casting reasons
+    # padding the signal extremities to increase resolution
+    field = torch.nn.functional.pad(input = field, pad = (npoints_pad//2, npoints_pad//2), mode = "constant", value = 0)
     # going from frequency to time
-    intensity_time = torch.real(torch.fft.ifft(intensity_frequency))
+    field_time = torch.fft.ifftshift(torch.fft.ifft(field))
+    # obtaining intensity
+    intensity_time = torch.real(field_time * torch.conj(field_time)) # only for casting reasons
     # normalizing the resulting signal
-    intensity_time / intensity_time.max() # normalizing
+    intensity_time = intensity_time / intensity_time.max() # normalizing
     
     # either returning time or not according to return_time
     if not return_time: 

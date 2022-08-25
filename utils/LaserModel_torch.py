@@ -2,6 +2,7 @@
 This script reproduces a semi-physical model for a pump-laser. 
 Author: Francesco Capuano, Summer 2022 S17 Intern @ ELI beam-lines, Prague.
 """
+from dataclasses import field
 from utils import physics_torch as pt
 # these imports are necessary to import modules from directories one level back in the folder structure
 import sys
@@ -17,11 +18,12 @@ import torch
 import numpy as np
 from scipy.constants import c
 import pandas as pd
-from numpy.fft import fft, ifft, fftfreq, fftshift
+from utils import physics as p
+import matplotlib.pyplot as plt
 
-class Computational_Laser: 
+class ComputationalLaser: 
     def __init__(
-                self, frequency:torch.tensor, intensity:torch.tensor, compressor_params:Tuple[float, float, float],
+                self, frequency:torch.tensor, field:torch.tensor, compressor_params:Tuple[float, float, float],
                 num_points_padding:int=int(3e4), B:float=2, central_frequency:float=(c/(1030*1e-9)), 
                 cristal_frequency:torch.tensor=None, cristal_intensity:torch.tensor=None
                 ) -> None:
@@ -30,7 +32,7 @@ class Computational_Laser:
 
         Args:
             frequency (torch.tensor): Tensor of frequencies, measured in THz, already preprocessed.
-            intensity (torch.tensor): Tensor of intensities (measured with respect to the frequency).
+            field (torch.tensor): Tensor of electrical field (measured with respect to the frequency).
             compressor_params (Tuple[float, float, float]): Compressor GDD, TOD and FOD. These are considered
                 laser-characteristic and are not controlled, therefore are essentially speaking hyper-parameters to the process.
             central_frequency (float, optional): Central frequency, may be derived from central wavelength. Defaults to (c/1030*1e-9) Hz.
@@ -40,15 +42,15 @@ class Computational_Laser:
             cristal_intensity (torch.tensor, optional): Intensity of the amplification in the non-linear cristal at the beginning of DIRA. Defaults to None.
         """
         self.frequency = frequency * 10 ** 12 # THz to Hz
-        self.field = np.sqrt(intensity) # electric field is the square root of intensity
+        self.field = field # electric field is the square root of intensity
         self.central_frequency = central_frequency
         # number of points to be used in padding 
         self.pad_points = num_points_padding
         # hyperparameters - LASER parametrization
-        self.compressorGDD, self.compressorTOD, self.compressorFOD = compressor_params
+        self.compressor_params = compressor_params
         self.B = B
         # storing the original input
-        self.input_frequency, self.input_field = frequency * 10 ** 12, torch.sqrt(intensity)
+        self.input_frequency, self.input_field = frequency * 10 ** 12, field
         # YB:Yab gain
         if cristal_intensity is not None and cristal_frequency is not None: 
             self.yb_frequency = cristal_frequency * 1e12 # THz to Hz
@@ -60,11 +62,27 @@ class Computational_Laser:
 
             gain_df.columns = ["Wavelength (nm)", "Intensity"]
             gain_df.Intensity = gain_df.Intensity / gain_df.Intensity.values.max()
-            gain_df["Frequency (THz)"] = gain_df["Wavelength (nm)"].apply(lambda wl: 1e12 * (c/((wl+1) * 1e-9))) # 1nm shift
+            gain_df["Frequency (THz)"] = gain_df["Wavelength (nm)"].apply(lambda wl: (c/((wl+1) * 1e-9))) # 1nm shift
 
             gain_df.sort_values(by = "Frequency (THz)", inplace = True)
-            self.yb_frequency, self.yb_field = torch.from_numpy(gain_df["Frequency (THz)"].values), torch.from_numpy(np.sqrt(gain_df["Intensity"].values))
-        
+            yb_frequency, yb_field = gain_df["Frequency (THz)"].values, np.sqrt(gain_df["Intensity"].values)
+            
+            # cutting the gain frequency accordingly
+
+            yb_frequency, yb_field = p.cutoff_signal(
+                frequency_cutoff=(self.frequency[0].item(), self.frequency[-1].item()), 
+                frequency = yb_frequency, 
+                signal = yb_field)
+            
+            # augmenting the cutted data
+            yb_frequency, yb_field = p.equidistant_points(
+                frequency = yb_frequency, 
+                signal = yb_field, 
+                num_points = len(self.frequency)
+            )
+
+            self.yb_intensity = torch.from_numpy(yb_field ** 2)
+
     def translate_control(self, control:torch.tensor, verse:str="to_gdd")->torch.tensor: 
         """This function translates the control quantities either from Dispersion coefficients (the di's) to GDD, TOD and FOD using a system of linear equations 
         defined for this very scope or the other way around, according to the string "verse".  
@@ -99,15 +117,15 @@ class Computational_Laser:
         Returns:
             Tuple[torch.tensor, torch.tensor]: Returns either (time, intensity) (with time measured in in femtoseconds) or intensity only.
         """
-        step = np.diff(self.frequency)[0]
-        time = fftshift(fftfreq(len(self.frequency) + self.pad_points, d=abs(step)))
+        step = torch.diff(self.frequency)[0]
+        time = torch.fft.fftshift(torch.fft.fftfreq(len(self.frequency) + self.pad_points, d=abs(step)))
 
         field_padded = torch.nn.functional.pad(self.field, pad=(self.pad_points // 2, self.pad_points // 2), mode = "constant", value = 0)
         # inverse FFT to go from frequency domain to temporal domain
         field_time = torch.fft.fftshift(torch.fft.ifft(field_padded))
-        intensity_time = field_time * torch.conj(field_time) # only for casting reasons
+        intensity_time = torch.real(field_time * torch.conj(field_time)) # only for casting reasons
 
-        intensity_time =  torch.real(intensity_time / intensity_time.max()) # normalizing
+        intensity_time =  intensity_time / intensity_time.max() # normalizing
         
         # either returning time or not according to return_time
         if not return_time: 
@@ -115,29 +133,33 @@ class Computational_Laser:
         else: 
             return time, intensity_time
         
-    def forward_pass(self, control:np.array) -> np.array: 
+    def forward_pass(self, control:torch.tensor)->torch.tensor: 
         """This function performs a forward pass in the model using control values stored in control.
 
         Args:
-            control (np.array): Control values to use in the forward pass.
+            control (torch.tensor): Control values to use in the forward pass. Must be dispersion coefficients. 
 
         Returns:
-            np.array: Temporal profile of intensity for the given control.
+            Tuple[torch.tensor, torch.tensor]: (Time scale, Temporal profile of intensity for the given control).
         """
-        # performing preprocessing operations
-        self.preprocessing()
-        # obtaining y1
-        self.y1 = self.stretcher(control = control)
-        # obtaining y2 
-        if self.B != 0: # linear effect
-            self.y1 = self.amplification()
-            self.y2 = self.DIRA()
-        else: 
-            self.y2 = self.y1 # no non-linear effect
-        # obtaining y3
-        self.y3 = self.compressor()
-        # padding y3 with zeros on the tails (to increase fft algorithm precision)
-        self.y3 = np.pad(self.y3, pad_width = (self.pad_points // 2, self.pad_points // 2), mode = "constant", constant_values = (0, 0))
-        # obtaining FROG in time
-        time, self.y3_time = self.FROG()
-        return time, self.y3_time
+        # control quantities regulate the phase
+        phi_stretcher = self.emit_phase(control = control)
+        # phase imposed on the input field
+        y1_frequency = pt.impose_phase(spectrum = self.field, phase = phi_stretcher)
+        # spectrum amplified by DIRA cristal
+        y1tilde_frequency = pt.yb_gain(signal = y1_frequency, intensity_yb=self.yb_intensity)
+        # spectrum amplified in time domain, to apply non linear phase to it
+        y1tilde_time = torch.fft.ifft(y1tilde_frequency)
+        # defining non-linear DIRA phase
+        intensity = torch.real(y1tilde_time * torch.conj(y1tilde_time)) ### Why not the y1?
+        phi_DIRA = (self.B / intensity.max()) * intensity
+        # applying non-linear DIRA phase to the spectrum
+        y2_time = pt.impose_phase(spectrum = y1tilde_time, phase = phi_DIRA)
+        # back to frequency domain
+        y2_frequency = torch.fft.fft(y2_time)
+        # defining phase imposed by compressor
+        phi_compressor = self.emit_phase(control = self.compressor_params)
+        # imposing compressor phase on spectrum
+        y3_frequency = pt.impose_phase(y2_frequency, phase = phi_compressor)
+        # return time scale and temporal profile of the (controlled) pulse
+        return pt.temporal_profile(frequency = self.frequency, field = y3_frequency, npoints_pad = self.pad_points)
