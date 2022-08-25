@@ -45,7 +45,7 @@ def extract_data()->Tuple[np.array, np.array]:
     
     return frequency, intensity
 
-def model(frequency, intensity, compressor, b_int, cutoff)->object: 
+def model(frequency, intensity, compressor, b_int, cutoff, num_points = 5000)->object: 
     """
     Returns the model instantiated with respect to arguments. 
     TO BE REMOVED: Consistency of arguments type is assumed in this function.
@@ -55,7 +55,8 @@ def model(frequency, intensity, compressor, b_int, cutoff)->object:
         intensity = intensity,
         compressor_params = compressor, 
         B = b_int, 
-        cutoff = cutoff)
+        cutoff = cutoff,
+        num_points=num_points)
 
     l1_pump.preprocessing()
     
