@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from bayes_opt import BayesianOptimization
 from utils import physics
 from utils import LaserModel as LM
+from utils.se import get_project_root
 from scipy.constants import c 
 
 def extract_data()->Tuple[np.array, np.array]: 
@@ -28,7 +29,8 @@ def extract_data()->Tuple[np.array, np.array]:
         Tuple[np.array, np.array]: Frequency (in THz) and Intensity arrays.
 
     """
-    data_path = "../data/L1_pump_spectrum.csv"
+    
+    data_path = str(get_project_root()) + "/data/L1_pump_spectrum.csv"
     # read the data
     df = pd.read_csv(data_path, header = None)
     df.columns = ["Wavelength (nm)", "Intensity"]

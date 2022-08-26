@@ -4,6 +4,7 @@ Author: Francesco Capuano, Summer 2022 S17 Intern @ ELI beam-lines, Prague.
 """
 from dataclasses import field
 from utils.physics import *
+from utils.se import get_project_root
 # these imports are necessary to import modules from directories one level back in the folder structure
 import sys
 import os
@@ -66,9 +67,8 @@ class LaserModel:
             self.yb_field = np.sqrt(cristal_intensity)
         else: 
             # reading the data with which to amplify the signal when non specific one is given
-            cristal_path = "../data/cristal_gain.txt"
+            cristal_path = str(get_project_root()) + "/data/cristal_gain.txt"
             gain_df = pd.read_csv(cristal_path, sep = "  ", skiprows = 2, header = None, engine = "python")
-
             gain_df.columns = ["Wavelength (nm)", "Intensity"]
             gain_df.Intensity = gain_df.Intensity / gain_df.Intensity.values.max()
             gain_df["Frequency (THz)"] = gain_df["Wavelength (nm)"].apply(lambda wl: 1e12 * (c/((wl+1) * 1e-9))) # 1nm shift
@@ -242,7 +242,7 @@ class LaserModel:
         return self.y2 * np.exp(1j * compressor_phase)
     
     def FROG(self) -> np.array: 
-        time = ifftshift(fftfreq(n = len(self.y3), d = np.diff(self.frequency)[0]))
+        time = ifftshift(fftfreq(n = self.num_points + self.pad_points, d = np.diff(self.frequency)[0]))
 
         # padding the spectral intensity and phase to increase sample complexity for the fft algorithm
         field_time = ifftshift(ifft(ifftshift(self.y3)))
@@ -270,7 +270,7 @@ class LaserModel:
             self.y1 = self.amplification()
             self.y2 = self.DIRA()
         else: 
-            self.y2 = self.y1 # no non-linear effect
+            self.y2 = self.y1 # non-linear effect
         # obtaining y3
         self.y3 = self.compressor()
         # padding y3 with zeros on the tails (to increase fft algorithm precision)
