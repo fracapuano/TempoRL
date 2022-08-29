@@ -3,14 +3,6 @@ This script implements basic functions useful for the software engineering part 
 """
 from pathlib import Path
 import json
-import argparse
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--path', type=str, help='Path of the jupyter notebook whose cells must be reordered')
-    return parser.parse_args()
-
-args = parse_args()
 
 def get_project_root() -> Path:
     """
@@ -18,13 +10,17 @@ def get_project_root() -> Path:
     """
     return Path(__file__).parent.parent
 
-def renumber_cells() -> None:
+def renumber_cells(path:str) -> None:
     """This function refactors a ipynb file so to have subsequent values.
+
+    Args: 
+        path (str): path where ipynb file is located with respect to parent directory. 
+    Returns: 
+        None: (file with increasing cell number)
     """
-    print(args.path.endswith(".ipynb"))
-    if not args.path.endswith(".ipynb"): 
+    if not path.endswith(".ipynb"): 
         raise ValueError("Script defined for notebooks only. Insert extension / change file type to notebook")
-    NOTEBOOK_FILE = str(get_project_root()) + "/" + args.path
+    NOTEBOOK_FILE = str(get_project_root()) + "/" + path
     with open(NOTEBOOK_FILE, 'rt') as f_in:
         doc = json.load(f_in)
     cnt = 1
@@ -40,8 +36,3 @@ def renumber_cells() -> None:
         json.dump(doc, f_out, indent=1)
 
     print("done")
-
-def main() -> None: 
-    renumber_cells()
-if __name__ == "__main__": 
-    main()
