@@ -20,6 +20,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import differential_evolution, Bounds
 from utils import physics
+from utils.se import get_project_root
 from utils import LaserModel as LM
 from scipy.constants import c 
 
@@ -30,7 +31,7 @@ def extract_data()->Tuple[np.array, np.array]:
         Tuple[np.array, np.array]: Frequency (in THz) and Intensity arrays.
 
     """
-    data_path = "../data/L1_pump_spectrum.csv"
+    data_path = str(get_project_root()) + "/data/L1_pump_spectrum.csv"
     # read the data
     df = pd.read_csv(data_path, header = None)
     df.columns = ["Wavelength (nm)", "Intensity"]
@@ -47,7 +48,7 @@ def extract_data()->Tuple[np.array, np.array]:
     
     return frequency, intensity
 
-def model(frequency, intensity, compressor, b_int, cutoff)->object: 
+def model(frequency, intensity, compressor, b_int, cutoff, num_points)->object: 
     """
     Returns the model instantiated with respect to arguments. 
     TO BE REMOVED: Consistency of arguments type is assumed in this function.
@@ -57,7 +58,8 @@ def model(frequency, intensity, compressor, b_int, cutoff)->object:
         intensity = intensity,
         compressor_params = compressor, 
         B = b_int, 
-        cutoff = cutoff)
+        cutoff = cutoff,
+        num_points = num_points)
 
     l1_pump.preprocessing()
     
