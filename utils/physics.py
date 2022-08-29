@@ -2,6 +2,9 @@ import numpy as np
 from numpy.fft import fft, ifft, fftfreq, fftshift
 from typing import Tuple
 from scipy.interpolate import UnivariateSpline
+from utils.se import get_project_root
+import pandas as pd
+from scipy.constants import c
 
 import matplotlib.pyplot as plt
 
@@ -41,6 +44,48 @@ def equidistant_points(frequency:np.array, signal:np.array, num_points:int=int(5
     equidistant_frequency = np.linspace(start = frequency.min(), stop = frequency.max(), num = num_points)
 
     return (equidistant_frequency, spline(equidistant_frequency))
+
+def amplification(frequency:np.array, field:np.array, n_passes:int=50, num_points:int=int(5e3)) -> np.array: 
+        r"""This function reproduces the effect that passing through a non-linear cristal has on the beam itself. In particular, this function applies
+        the modification present in data/cristal_gain.txt to the spectrum coming out of the spectrum effectively modifying it. 
+
+        Args:
+            frequency (np.array): Array of frequencies considered.
+            field (np.array): Array of electric field represented in frequency domain.
+            n_passes (int, optional): Number of passes through the non linear cristal.
+
+        Returns:
+            np.array: The field in the laser (\tilde{y}_1), which is the result of the spectrum modification carried out in the non linear cristal.
+        """
+         # reading the data with which to amplify the signal when non specific one is given
+        cristal_path = str(get_project_root()) + "/data/cristal_gain.txt"
+        gain_df = pd.read_csv(cristal_path, sep = "  ", skiprows = 2, header = None, engine = "python")
+        gain_df.columns = ["Wavelength (nm)", "Intensity"]
+        gain_df.Intensity = gain_df.Intensity / gain_df.Intensity.values.max()
+        gain_df["Frequency (THz)"] = gain_df["Wavelength (nm)"].apply(lambda wl: 1e12 * (c/((wl+1) * 1e-9))) # 1nm shift
+
+        gain_df.sort_values(by = "Frequency (THz)", inplace = True)
+        yb_frequency, yb_field = gain_df["Frequency (THz)"].values, np.sqrt(gain_df["Intensity"].values)
+        # cutting the gain frequency accordingly
+        yb_frequency, yb_field = cutoff_signal(
+            frequency_cutoff=(frequency[0], frequency[-1]), 
+            frequency = yb_frequency * 1e-12, 
+            signal = yb_field)
+        
+        # augmenting the cutted data
+        yb_frequency, yb_field = equidistant_points(
+            frequency = yb_frequency, 
+            signal = yb_field, 
+            num_points = num_points
+        )
+        
+        amp_field = yb_field * field
+
+        for _ in range(1, n_passes): 
+            amp_field *=  yb_field
+        
+        return amp_field
+
 
 def central_frequency(frequency:np.array, signal:np.array) -> float: 
     """This function computes the central frequency of a given signal. 

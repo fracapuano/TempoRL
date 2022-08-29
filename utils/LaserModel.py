@@ -179,7 +179,7 @@ class LaserModel:
         return self.field * np.exp(1j * controlled_phase)
 
     def amplification(self, n_passes:int=50) -> np.array: 
-        """This function reproduces the effect that passing through a non-linear cristal has on the beam itself. In particular, this function applies
+        r"""This function reproduces the effect that passing through a non-linear cristal has on the beam itself. In particular, this function applies
         the modification present in data/cristal_gain.txt to the spectrum coming out of the spectrum effectively modifying it. 
 
         Args:
@@ -265,9 +265,10 @@ class LaserModel:
         self.preprocessing()
         # obtaining y1
         self.y1 = self.stretcher(control = control)
+        # amplification takes always place
+        self.y1 = self.amplification()
         # obtaining y2 
         if self.B != 0: # linear effect
-            self.y1 = self.amplification()
             self.y2 = self.DIRA()
         else: 
             self.y2 = self.y1 # non-linear effect
