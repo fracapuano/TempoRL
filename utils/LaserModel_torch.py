@@ -9,6 +9,8 @@ import sys
 import os
 import inspect
 
+from utils.se import get_project_root
+
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
@@ -57,7 +59,7 @@ class ComputationalLaser:
             self.yb_field = torch.sqrt(cristal_intensity)
         else: 
             # reading the data with which to amplify the signal when non specific one is given
-            cristal_path = "../data/cristal_gain.txt"
+            cristal_path = str(get_project_root()) + "/data/cristal_gain.txt"
             gain_df = pd.read_csv(cristal_path, sep = "  ", skiprows = 2, header = None, engine = "python")
 
             gain_df.columns = ["Wavelength (nm)", "Intensity"]
@@ -118,9 +120,15 @@ class ComputationalLaser:
             Tuple[torch.tensor, torch.tensor]: Returns either (time, intensity) (with time measured in in femtoseconds) or intensity only.
         """
         step = torch.diff(self.frequency)[0]
-        time = torch.fft.fftshift(torch.fft.fftfreq(len(self.frequency) + self.pad_points, d=abs(step)))
-
-        field_padded = torch.nn.functional.pad(self.field, pad=(self.pad_points // 2, self.pad_points // 2), mode = "constant", value = 0)
+        Dt = 1 / step
+        time = torch.linspace(start = - Dt/2, end = Dt/2, steps = len(self.frequency) + self.pad_points)
+        # transform limited of amplified spectrum
+        field_padded = torch.nn.functional.pad(
+            pt.yb_gain(self.field, torch.sqrt(self.yb_intensity)),
+            pad=(self.pad_points // 2, self.pad_points // 2), 
+            mode = "constant", 
+            value = 0
+        )
         # inverse FFT to go from frequency domain to temporal domain
         field_time = torch.fft.fftshift(torch.fft.ifft(field_padded))
         intensity_time = torch.real(field_time * torch.conj(field_time)) # only for casting reasons
