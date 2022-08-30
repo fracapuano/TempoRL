@@ -4,11 +4,10 @@ This script performs Bayesian Optimisation to optimize pulse shape.
 Author: Francesco Capuano, ELI-beamlines intern, Summer 2022. 
 """
 # these imports are necessary to import modules from directories one level back in the folder structure
-import dill as pickle
 import sys
 import os
 from turtle import up
-from typing import Tuple
+from typing import Mapping, Tuple
 import inspect
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -19,10 +18,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import differential_evolution, Bounds
+from scipy.interpolate import UnivariateSpline
 from utils import physics
 from utils.se import get_project_root
 from utils import LaserModel as LM
-from scipy.constants import c 
+from scipy.constants import c
+from scipy.signal import find_peaks, peak_widths
 
 def extract_data()->Tuple[np.array, np.array]: 
     """This function extracts the desired information from the data file given.
@@ -64,6 +65,7 @@ def model(frequency, intensity, compressor, b_int, cutoff, num_points)->object:
     l1_pump.preprocessing()
     
     return l1_pump
+
 def bounds(GDDperc=0.05, TODperc=0.4, FODperc=0.3): 
     frequency, intensity = extract_data() # extracting the desired information
     COMPRESSOR = -1 * np.array((267.422 * 1e-24, -2.384 * 1e-36, 9.54893 * 1e-50)) # in s^2, s^3 and s^4 (SI units)
@@ -97,23 +99,13 @@ def bounds(GDDperc=0.05, TODperc=0.4, FODperc=0.3):
     )
     return pbounds
 
-def objective_function(x,): 
-    frequency, intensity = extract_data() # extracting the desired information
-    COMPRESSOR = -1 * np.array((267.422 * 1e-24, -2.384 * 1e-36, 9.54893 * 1e-50)) # in s^2, s^3 and s^4 (SI units)
-    B = 2
-    CUTOFF = (289.95, 291.91) # cutoff frequencies, in THz
+def initial_guess() -> np.array: 
+    """This function returns the translated version of the control parameters of the compressor so as to use them 
+    as initial guess for differential evolution.
 
-    l1_pump = model(frequency, intensity, COMPRESSOR, B, CUTOFF)
-    # pre-processed version of frequency and intensity
-    frequency_clean, intensity_clean = l1_pump.spit_center()
-
-    _, profile_TL = physics.temporal_profile(frequency_clean, np.sqrt(intensity_clean), phase = np.zeros_like(frequency_clean), npoints_pad = l1_pump.pad_points)
-    d2, d3, d4 = x
-    temporal_profile = l1_pump.forward_pass(np.array((d2, d3, d4)))[1]
-    temporal_profile = np.roll(temporal_profile, np.argmax(temporal_profile) - np.argmax(profile_TL))
-    return physics.mse(temporal_profile, profile_TL)
-
-def initial_guess(): 
+    Returns:
+        np.array: Initial guess
+    """
     frequency, intensity = extract_data() # extracting the desired information
     COMPRESSOR = -1 * np.array((267.422 * 1e-24, -2.384 * 1e-36, 9.54893 * 1e-50)) # in s^2, s^3 and s^4 (SI units)
     B = 2
@@ -124,58 +116,73 @@ def initial_guess():
 
     return x0
 
-def main()->None: 
+def diff_evolution(
+    objective_function:Mapping[np.array, float], 
+    bounds:np.ndarray, 
+    mutation:float = 0.8, 
+    cross_p:float = 0.7, 
+    population_size:int = 20, 
+    maxit:int=int(3e3), 
+    verbose:int=0, 
+    print_every:int=10):
+    """This function implements the Differential Evolution algorithm rand/1/bin version.
 
-    b = bounds()
-    init_guess = initial_guess()
-    seed = 7
-
-    # optimisation parameter
-    recombination, mutation, tol, maxiter = 0.7, 0.6, 1e-5, 10
-    
-    result = differential_evolution(
-        func = objective_function, 
-        bounds = b, 
-        maxiter = maxiter, 
-        tol = tol, 
-        seed = seed, 
-        # x0 = init_guess, 
-        workers = -1,
-        recombination = recombination, 
-        mutation = mutation, 
-        disp = True
-    )
-
-    optimal_control = result.x
-    optimald2, optimald3, optimald4 = optimal_control
-
-    frequency, intensity = extract_data() # extracting the desired information
-    COMPRESSOR = -1 * np.array((267.422 * 1e-24, -2.384 * 1e-36, 9.54893 * 1e-50)) # in s^2, s^3 and s^4 (SI units)
-    B = 2
-    CUTOFF = (289.95, 291.91) # cutoff frequencies, in THz
-
-    l1_pump = model(frequency, intensity, COMPRESSOR, B, CUTOFF)
-    # pre-processed version of frequency and intensity
-    frequency_clean, intensity_clean = l1_pump.spit_center()
-
-    time, profile_TL = physics.temporal_profile(frequency_clean, np.sqrt(intensity_clean), phase = np.zeros_like(frequency_clean), npoints_pad = l1_pump.pad_points)
-
-    # applying optimal control found
-    time_BO, profile_BO = l1_pump.forward_pass(optimal_control)
-
-    fig, ax = plt.subplots()
-    
-    ax.set_title("Pulse Optimization results", fontsize = 12, fontweight = "bold")
-    ax.plot(time_BO, profile_BO, label = "DE output")
-    ax.scatter(time, profile_TL, label = "Target Pulse", c = "tab:grey", marker = "x", s = 50)
-    ax.set_xlabel(r"Time (s)"); ax.set_ylabel("Intensity")
-
-    ax.legend()
-    ax.set_xlim(left = -0.1e-11, right = +0.1e-11)
-    fig.tight_layout()
-    plt.show()
-
-    print("Final MSE between Control and Target: {:.4e}".format(-1*objective_function(optimald2, optimald3, optimald4)))
- 
-if __name__ == "__main__": 
-    main()
+    Args:
+        objective_function (function): Objective function to minimize.
+        bounds (np.ndarray): Multi-dimensional array of dimension nx2, where n is the dimension of the input vector to objective function.
+        mutation (float, optional): Mutation coefficient used to combine population elements. Must be in [0.5, 2). Defaults to 0.8.
+        cross_p (float, optional): Probability that each element in the best candidate is replaced with the corresponding element in the mutant. 
+                                   Defaults to 0.7.
+        popsize (int, optional): Number of elements in the population. Defaults to 20.
+        maxit (int, optional): Maximal number of iteration. Defaults to int(3e3).
+        verbose (int, optional): Whether or not to display information along training. If larger than zero prints iteration
+                                 number and objective function value. Defaults to 0.
+        print_every (int, optional): Batch counter after which to print information if verbose is larger than 0. Defaults to 10.
+    Yields:
+        Tuple[int, float]: Iteration idx and objective function value for the best candidate
+    """
+    # accessing the dimensionality of the input vector
+    dimensions = len(bounds)
+    # initializing the population to random size
+    pop = np.random.rand(population_size, dimensions)
+    # obtaining the extreme values for the bounds
+    min_b, max_b = np.asarray(bounds).T
+    # absolute range per component in bounds
+    diff = np.fabs(min_b - max_b)
+    # de-normalizing (from (0-1) to another range) the population
+    pop_denorm = min_b + pop * diff
+    # evaluating the function at each point in the population
+    fitness = np.asarray([objective_function(ind) for ind in pop_denorm])
+    # obtaining the index corresponding to the minimal value of the objective function
+    best_idx = np.argmin(fitness)
+    # obtaining the best element in the population
+    best = pop_denorm[best_idx]
+    for i in range(maxit):
+        # cycling over the population members
+        for j in range(population_size):
+            # accessing all the indexes a part from the one corresponding to the best candidate
+            idxs = [idx for idx in range(population_size) if idx != j]
+            # sampling without replacement three elements of the population at random to apply mutation
+            a, b, c = pop[np.random.choice(idxs, 3, replace = False)]
+            # mapping the mutant to the 0-1 range
+            mutant = np.clip(a + mutation * (b - c), 0, 1)
+            # masking those points to be overwritten according to recombination
+            cross_points = np.random.rand(dimensions) < cross_p
+            # making sure to recombine at least one element
+            if not np.any(cross_points):
+                cross_points[np.random.randint(0, dimensions)] = True
+            # recombination step
+            trial = np.where(cross_points, mutant, pop[j])
+            # mapping the new trial vector to the range considered rather than 0-1
+            trial_denorm = min_b + trial * diff
+            # evaluating the objective function at this best point
+            f = objective_function(trial_denorm)
+            if f < fitness[j]: # if trial point is good, save it
+                fitness[j] = f 
+                pop[j] = trial
+                if f < fitness[best_idx]: # if trial point is better than current best then store it
+                    best_idx = j
+                    best = trial_denorm
+        if verbose != 0 and i % print_every == 0: 
+            print(f"Iteration {i} - Objective Function value: {fitness[best_idx]}")
+    return best
