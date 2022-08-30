@@ -68,13 +68,13 @@ def model(frequency:np.array, intensity:np.array, compressor:np.array, b_int:int
     return l1_pump
 
 class Losses: 
-    def __init__(self): 
-        self.frequency, intensity = extract_data() # extracting the desired information
-        self.COMPRESSOR = -1 * np.array((267.422 * 1e-24, -2.384 * 1e-36, 9.54893 * 1e-50)) # in s^2, s^3 and s^4 (SI units)
-        self.B = 2
-        CUTOFF = (289.95, 291.91) # cutoff frequencies, in THz
+    def __init__(self, laser:object): 
+        """Init function.
 
-        self.laser = model(self.frequency, intensity, self.COMPRESSOR, self.B, CUTOFF)
+        Args:
+            laser (object): LaserModel object - Used to retrieve all possible information on the signal with ease. 
+        """
+        self.laser = laser
         # pre-processed version of frequency and intensity
         frequency_clean, field_clean = self.laser.spit_center()
 
