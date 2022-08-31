@@ -31,17 +31,18 @@ class LaserOptimization(torch.nn.Module):
         self.up_bound = torch.tensor(bounds_matrix[:, 1])
         
         self.ComputationalLaser = CL
+        # initialize weights with random number - make weights torch parameters
         
-        # initialize weights with random numbers
-        control = torch.distributions.Uniform(
-            low = torch.from_numpy(bounds_matrix[:, 0]), 
-            high = torch.from_numpy(bounds_matrix[:, 1])
-        ).sample()
-
-        # make weights torch parameters
-        self.control = torch.nn.Parameter(control).cuda() if torch.cuda.is_available() else torch.nn.Parameter(control)    
+        self.control = torch.nn.ParameterList(
+            [
+                torch.distributions.Uniform(
+                    low = torch.tensor(bounds_matrix[i, 0]), 
+                    high = torch.tensor(bounds_matrix[i, 1])
+                ).sample() for i in range(len(bounds_matrix))       
+            ]
+        )  
         
-    def objective_function(self, mu:float=1e-3) -> torch.tensor:
+    def objective_function(self, mu:float=1e9) -> torch.tensor:
         """
         Implements the function to be minimised. In this case such a function will be the L1 norm corrected 
         with a log barrier to maintain the parameters into the feasible region.
@@ -52,14 +53,20 @@ class LaserOptimization(torch.nn.Module):
         Returns: 
             torch.tensor: One-element tensor (scalar) storing the value of objective function.
         """
-        
-        _, control_profile = self.ComputationalLaser.forward_pass(self.control)
+        GDD, TOD, FOD = self.control
+        control = torch.stack((GDD, TOD, FOD))
+
+        _, control_profile = self.ComputationalLaser.forward_pass(control.cpu())
+        control_profile = control_profile.to("cuda") if torch.cuda.is_available() else control_profile
         _, target_profile = self.ComputationalLaser.transform_limited()
-
+        target_profile = target_profile.to("cuda") if torch.cuda.is_available() else target_profile
+        
         f_control = self.loss(control_profile, target_profile)
-        constraint_violation = torch.log(self.control - self.low_bound).sum() + torch.log(self.up_bound - self.control).sum()
+        # now GDD, TOD and FOD - to be adjusted to d2, d3, d4
+        
+        # constraint_violation = torch.log(control - self.low_bound).sum() + torch.log(self.up_bound - control).sum()
 
-        return f_control + mu * constraint_violation
+        return f_control # - mu * constraint_violation
 
 def optimization(model:object, optimizer:torch.optim, maxit:int=int(5e3)) -> Tuple[torch.tensor, torch.tensor]:
     """This function performs optimization (using optimizer) of the model defined in model (pytorch model)
@@ -73,10 +80,10 @@ def optimization(model:object, optimizer:torch.optim, maxit:int=int(5e3)) -> Tup
     Returns:
         Tuple[torch.tensor, torch.tensor]: Losses over iterate and best control parameters found, respectively. 
     """
-    losses = torch.zeros(size = maxit)
+    losses = torch.zeros(maxit)
     
     for it in (pbar := tqdm(range(maxit))):
-        pbar.set_description("Iteration %s/%s" %it %maxit)
+        pbar.set_description("Iteration %s %s" % (it+1, maxit))
         # zero-grad optimizer
         optimizer.zero_grad()
         # backwarding objective function
@@ -86,4 +93,4 @@ def optimization(model:object, optimizer:torch.optim, maxit:int=int(5e3)) -> Tup
         # storing the value of the loss
         losses[it] = model.objective_function()
     
-    return losses
+    return losses, torch.tensor(model.control)
