@@ -27,8 +27,8 @@ class LaserOptimization(torch.nn.Module):
 
         bounds_matrix = np.vstack((bounds_control.lb, bounds_control.ub)).T
         
-        self.low_bound = torch.tensor(bounds_matrix[:, 0])
-        self.up_bound = torch.tensor(bounds_matrix[:, 1])
+        self.low_bound = torch.tensor(bounds_matrix[:, 0]).cuda() if torch.cuda.is_available() else torch.tensor(bounds_matrix[:, 0])
+        self.up_bound = torch.tensor(bounds_matrix[:, 1]).cuda() if torch.cuda.is_available() else torch.tensor(bounds_matrix[:, 1])
         
         self.ComputationalLaser = CL
         # initialize weights with random number - make weights torch parameters
@@ -56,7 +56,7 @@ class LaserOptimization(torch.nn.Module):
         GDD, TOD, FOD = self.control
         control = torch.stack((GDD, TOD, FOD))
 
-        _, control_profile = self.ComputationalLaser.forward_pass(control.cpu())
+        _, control_profile = self.ComputationalLaser.forward_pass(control)
         control_profile = control_profile.to("cuda") if torch.cuda.is_available() else control_profile
         _, target_profile = self.ComputationalLaser.transform_limited()
         target_profile = target_profile.to("cuda") if torch.cuda.is_available() else target_profile
@@ -64,9 +64,9 @@ class LaserOptimization(torch.nn.Module):
         f_control = self.loss(control_profile, target_profile)
         # now GDD, TOD and FOD - to be adjusted to d2, d3, d4
         
-        # constraint_violation = torch.log(control - self.low_bound).sum() + torch.log(self.up_bound - control).sum()
+        constraint_violation = torch.log(torch.abs(control - self.low_bound)).sum() + torch.log(torch.abs(self.up_bound - control)).sum()
 
-        return f_control # - mu * constraint_violation
+        return f_control - mu * constraint_violation
 
 def optimization(model:object, optimizer:torch.optim, maxit:int=int(5e3)) -> Tuple[torch.tensor, torch.tensor]:
     """This function performs optimization (using optimizer) of the model defined in model (pytorch model)
@@ -91,6 +91,8 @@ def optimization(model:object, optimizer:torch.optim, maxit:int=int(5e3)) -> Tup
         # stepping optimizer
         optimizer.step()
         # storing the value of the loss
-        losses[it] = model.objective_function()
+        losses[it] = model.objective_function().item()
+        # empty cuda cache
+        torch.cuda.empty_cache()
     
     return losses, torch.tensor(model.control)
