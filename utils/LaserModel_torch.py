@@ -21,7 +21,8 @@ import numpy as np
 from scipy.constants import c
 import pandas as pd
 from utils import physics as p
-import matplotlib.pyplot as plt
+
+cuda_available = torch.cuda.is_available()
 
 class ComputationalLaser: 
     def __init__(
@@ -129,17 +130,20 @@ class ComputationalLaser:
             mode = "constant", 
             value = 0
         )
+
+        field_padded = field_padded.to("cuda") if cuda_available else field_padded
+
         # inverse FFT to go from frequency domain to temporal domain
-        field_time = torch.fft.fftshift(torch.fft.ifft(field_padded))
+        field_time = torch.fft.ifftshift(torch.fft.ifft(field_padded))
         intensity_time = torch.real(field_time * torch.conj(field_time)) # only for casting reasons
 
         intensity_time =  intensity_time / intensity_time.max() # normalizing
         
         # either returning time or not according to return_time
         if not return_time: 
-            return intensity_time
+            return intensity_time if cuda_available else intensity_time.cpu()
         else: 
-            return time, intensity_time
+            return time, intensity_time if cuda_available else intensity_time.cpu()
         
     def forward_pass(self, control:torch.tensor)->torch.tensor: 
         """This function performs a forward pass in the model using control values stored in control.

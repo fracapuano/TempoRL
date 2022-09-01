@@ -2,6 +2,9 @@ import numpy as np
 import torch
 from typing import Tuple
 from scipy.constants import c
+from utils.torch_utils import iterable_to_cuda
+
+cuda_available = torch.cuda.is_available()
 
 def translate_control(central_frequency:float, control:torch.tensor, verse:str = "to_gdd")->torch.tensor: 
         """This function translates the control quantities either from Dispersion coefficients (the di's) to GDD, TOD and FOD using a system of linear equations 
@@ -29,16 +32,18 @@ def translate_control(central_frequency:float, control:torch.tensor, verse:str =
             [a31, a32, a33]
         ], dtype = torch.float64
         )
+        # sending to cuda, if applicable
+        A, control = iterable_to_cuda(input = [A, control])
 
         if verse.lower() == "to_gdd": 
             d2, d3, d4 = control
             # solving the conversion system using forward substitution
-            GDD = d2 / a11; TOD = (d3 - a21 * GDD)/(a22); FOD = (d4 - a31 * GDD - a32 * TOD)/(a33)
+            GDD = d2 / A[1,1]; TOD = (d3 - A[2,1] * GDD)/(A[2,2]); FOD = (d4 - A[3,1] * GDD - A[3,2] * TOD)/(A[3,3])
             # grouping the tensors maintaing information on the gradient
             return torch.stack([GDD, TOD, FOD])
 
         elif verse.lower() == "to_disp": 
-            return A @ control
+            return A @ control if cuda_available else (A @ control).cpu()
         else: 
             raise ValueError('Control translatin is either "to_gdd" or "to_disp"!')
 
@@ -53,12 +58,16 @@ def phase_equation(frequency:torch.tensor, central_frequency:float, control:torc
     Returns:
         torch.tensor: The phase with respect to the frequency, measured in radiants.
     """
+    central_frequency = torch.tensor(central_frequency, dtype = torch.float64)
+    frequency, control, central_frequency = iterable_to_cuda(input = [frequency, control, central_frequency])
+
     GDD, TOD, FOD = control
     phase = \
             (1/2)* GDD * (2*torch.pi * (frequency - central_frequency))**2 + \
             (1/6)* TOD * (2*torch.pi * (frequency - central_frequency))**3 + \
             (1/24)* FOD * (2*torch.pi * (frequency - central_frequency))**4
-    return phase
+    
+    return phase if torch.cuda.is_available() else phase.cpu()
 
 def yb_gain(signal:torch.tensor, intensity_yb:torch.tensor, n_passes:int=50)->torch.tensor: 
     """This function models the passage of the signal in the cristal in which yb:yab gain is observed.
@@ -71,6 +80,9 @@ def yb_gain(signal:torch.tensor, intensity_yb:torch.tensor, n_passes:int=50)->to
     Returns: 
         torch.tensor: New spectrum, narrower because of the gain. 
     """
+    n_passes = torch.tensor(n_passes, dtype = torch.float64)
+    signal, intensity_yb, n_passes = iterable_to_cuda(input = [signal, intensity_yb, n_passes])
+    
     return signal * (intensity_yb ** n_passes)
 
 def impose_phase(spectrum:torch.tensor, phase:torch.tensor)->torch.tensor: 
@@ -83,6 +95,7 @@ def impose_phase(spectrum:torch.tensor, phase:torch.tensor)->torch.tensor:
     Returns: 
         torch.tensor: New spectrum with modified phase
     """
+    spectrum, phase = iterable_to_cuda(input = [spectrum, phase])
     return spectrum * torch.exp(1j * phase)
 
 def temporal_profile(frequency:torch.tensor, field:torch.tensor, npoints_pad:int=int(1e4), return_time:bool=True) -> Tuple[np.array, np.array]:
@@ -97,10 +110,13 @@ def temporal_profile(frequency:torch.tensor, field:torch.tensor, npoints_pad:int
     Returns:
         Tuple[np.array, np.array]: Returns either (time, intensity) (with time measured in in seconds) or intensity only.
     """
+    # send iterable to cuda
+    frequency, field = iterable_to_cuda(input = [frequency, field])
+    # create the time array
     step = torch.diff(frequency)[0]
-    # centering the array in its peak
-    time = torch.fft.fftshift(torch.fft.fftfreq(len(frequency) + npoints_pad, d=abs(step)))
-    # padding the signal extremities to increase resolution
+    Dt = 1 / step
+    time = torch.linspace(start = - Dt/2, end = Dt/2, steps = len(frequency) + npoints_pad)
+    # centering the array in its peak - padding the signal extremities to increase resolution
     field = torch.nn.functional.pad(input = field, pad = (npoints_pad//2, npoints_pad//2), mode = "constant", value = 0)
     # going from frequency to time
     field_time = torch.fft.ifftshift(torch.fft.ifft(field))
@@ -111,6 +127,6 @@ def temporal_profile(frequency:torch.tensor, field:torch.tensor, npoints_pad:int
     
     # either returning time or not according to return_time
     if not return_time: 
-        return intensity_time
+        return intensity_time if cuda_available else intensity_time.cpu()
     else: 
         return time, intensity_time
