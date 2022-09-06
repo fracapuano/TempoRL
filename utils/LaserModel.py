@@ -252,6 +252,15 @@ class LaserModel:
 
         return time, intensity_time
 
+    def Autocorrelation(self) -> np.array:
+        time = ifftshift(fftfreq(n = self.num_points + self.pad_points, d = np.diff(self.frequency)[0]))
+        field_time = ifftshift(ifft(ifftshift(self.y3)))
+        intensity_time = np.real(field_time * np.conj(field_time)) # only for casting reasons
+        intensity_time = intensity_time / intensity_time.max() # normalizing intensity
+        autocorrelation = np.correlate(intensity_time, np.conj(intensity_time), mode='same')
+        autocorrelation = autocorrelation / autocorrelation.max()
+        return time, autocorrelation
+
     def forward_pass(self, control:np.array) -> np.array: 
         """This function performs a forward pass in the model using control values stored in control.
 
