@@ -257,7 +257,7 @@ class LaserModel:
         field_time = ifftshift(ifft(ifftshift(self.y3)))
         intensity_time = np.real(field_time * np.conj(field_time)) # only for casting reasons
         intensity_time = intensity_time / intensity_time.max() # normalizing intensity
-        autocorrelation = np.correlate(intensity_time, np.intensity_time, mode='same')
+        autocorrelation = np.correlate(intensity_time, intensity_time, mode='same')
         autocorrelation = autocorrelation / autocorrelation.sum() #normalize to area
         return time, autocorrelation
 
