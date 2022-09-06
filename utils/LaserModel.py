@@ -258,7 +258,8 @@ class LaserModel:
         intensity_time = np.real(field_time * np.conj(field_time)) # only for casting reasons
         intensity_time = intensity_time / intensity_time.max() # normalizing intensity
         autocorrelation = np.correlate(intensity_time, np.conj(intensity_time), mode='same')
-        autocorrelation = autocorrelation / autocorrelation.max()
+        autocorrelation = autocorrelation / autocorrelation.max() #normalize to maximum
+        autocorrelation = autocorrelation / autocorrelation.sum() #normalize to area
         return time, autocorrelation
 
     def forward_pass(self, control:np.array) -> np.array: 
