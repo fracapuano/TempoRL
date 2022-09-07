@@ -45,6 +45,21 @@ def equidistant_points(frequency:np.array, signal:np.array, num_points:int=int(5
 
     return (equidistant_frequency, spline(equidistant_frequency))
 
+def time_from_frequency(frequency:np.array, pad_points: int) -> np.array:
+    """This function generates a temporal vector based on the frequency vector and the ammount of zero padded points.
+
+    Args:
+        frequency (np.array): Array of frequencies considered measured in THz.
+        pad_points (np.array): The ammount of zero padded points.
+
+    Returns:
+        np.array: Equidistant array of time 
+    """
+    step = np.diff(frequency)[0]
+    Dt = 1 / step
+    time =  np.linspace(start = -Dt/2, stop = +Dt/2, num = pad_points + len(frequency))    
+    return time
+
 def amplification(frequency:np.array, field:np.array, n_passes:int=50, num_points:int=int(5e3)) -> np.array: 
         r"""This function reproduces the effect that passing through a non-linear cristal has on the beam itself. In particular, this function applies
         the modification present in data/cristal_gain.txt to the spectrum coming out of the spectrum effectively modifying it. 
