@@ -167,10 +167,7 @@ def temporal_profile(frequency:np.array, field:np.array, phase:np.array, npoints
     Returns:
         Tuple[np.array, np.array]: Returns either (time, intensity) (with time measured in in femtoseconds) or intensity only.
     """
-    step = np.diff(frequency)[0]
-    Dt = 1/step
-    time = np.linspace(start = -Dt/2, stop = +Dt/2, num = npoints_pad + len(frequency))
-
+    time = time_from_frequency(frequency, npoints_pad)
     field_padded = np.pad(field, pad_width=(npoints_pad // 2, npoints_pad // 2), mode = "constant", constant_values = (0, 0))
     phase_padded = np.pad(phase, pad_width=(npoints_pad // 2, npoints_pad // 2), mode = "constant", constant_values = (0, 0))
 
