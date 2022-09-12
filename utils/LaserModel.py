@@ -242,8 +242,7 @@ class LaserModel:
         return self.y2 * np.exp(1j * compressor_phase)
     
     def FROG(self) -> np.array: 
-        time = ifftshift(fftfreq(n = self.num_points + self.pad_points, d = np.diff(self.frequency)[0]))
-
+        time = time_from_frequency(self.frequency, self.pad_points)
         # padding the spectral intensity and phase to increase sample complexity for the fft algorithm
         field_time = ifftshift(ifft(ifftshift(self.y3)))
         
@@ -253,7 +252,7 @@ class LaserModel:
         return time, intensity_time
 
     def autocorrelation(self) -> np.array:
-        time = ifftshift(fftfreq(n = self.num_points + self.pad_points, d = np.diff(self.frequency)[0]))
+        time = time_from_frequency(self.frequency, self.pad_points)
         field_time = ifftshift(ifft(ifftshift(self.y3)))
         intensity_time = np.real(field_time * np.conj(field_time)) # only for casting reasons
         intensity_time = intensity_time / intensity_time.max() # normalizing intensity
