@@ -4,6 +4,7 @@ This script performs Bayesian Optimisation to optimize pulse shape.
 Author: Francesco Capuano, ELI-beamlines intern, Summer 2022. 
 """
 # these imports are necessary to import modules from directories one level back in the folder structure
+from dataclasses import field
 import sys
 import os
 from typing import Tuple
@@ -44,8 +45,9 @@ def extract_data()->Tuple[np.array, np.array]:
     frequency, intensity = df.loc[:, "Frequency (THz)"].values, df.loc[:, "Intensity"].values
     # mapping intensity in the 0-1 range
     intensity = (intensity - intensity.min()) / (intensity.max() - intensity.min())
+    field = np.sqrt(intensity)
     
-    return frequency, intensity
+    return frequency, field
 
 def model(frequency, intensity, compressor, b_int, cutoff, num_points = 5000)->object: 
     """
