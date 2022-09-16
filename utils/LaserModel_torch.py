@@ -65,7 +65,7 @@ class ComputationalLaser:
 
             gain_df.columns = ["Wavelength (nm)", "Intensity"]
             gain_df.Intensity = gain_df.Intensity / gain_df.Intensity.values.max()
-            gain_df["Frequency (THz)"] = gain_df["Wavelength (nm)"].apply(lambda wl: (c/((wl+1) * 1e-9))) # 1nm shift
+            gain_df["Frequency (THz)"] = gain_df["Wavelength (nm)"].apply(lambda wl: (c/((wl+1) * 1e-9))) # 1nm rightwards shift
 
             gain_df.sort_values(by = "Frequency (THz)", inplace = True)
             yb_frequency, yb_field = gain_df["Frequency (THz)"].values, np.sqrt(gain_df["Intensity"].values)
@@ -83,8 +83,9 @@ class ComputationalLaser:
                 signal = yb_field, 
                 num_points = len(self.frequency)
             )
-
+            self.yb_frequency = torch.from_numpy(yb_frequency)
             self.yb_intensity = torch.from_numpy(yb_field ** 2)
+            self.yb_field = torch.from_numpy(yb_field)
 
     def translate_control(self, control:torch.tensor, verse:str="to_gdd")->torch.tensor: 
         """This function translates the control quantities either from Dispersion coefficients (the di's) to GDD, TOD and FOD using a system of linear equations 
@@ -159,11 +160,11 @@ class ComputationalLaser:
         # phase imposed on the input field
         y1_frequency = pt.impose_phase(spectrum = self.field, phase = phi_stretcher)
         # spectrum amplified by DIRA cristal
-        y1tilde_frequency = pt.yb_gain(signal = y1_frequency, intensity_yb=self.yb_intensity)
+        y1tilde_frequency = pt.yb_gain(signal = y1_frequency, intensity_yb=self.yb_field)
         # spectrum amplified in time domain, to apply non linear phase to it
         y1tilde_time = torch.fft.ifft(y1tilde_frequency)
         # defining non-linear DIRA phase
-        intensity = torch.real(y1tilde_time * torch.conj(y1tilde_time)) ### Why not the y1?
+        intensity = torch.real(y1tilde_time * torch.conj(y1tilde_time))
         phi_DIRA = (self.B / intensity.max()) * intensity
         # applying non-linear DIRA phase to the spectrum
         y2_time = pt.impose_phase(spectrum = y1tilde_time, phase = phi_DIRA)
