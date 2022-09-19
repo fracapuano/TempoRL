@@ -189,6 +189,28 @@ def FWHM(x:np.array, y:np.array, return_roots:bool=False)->Union[float, Tuple[fl
         return FWHM_value, (r1, r2)
     else: 
         return FWHM_value
+
+def FWPercM(x:np.array, y:np.array, perc:float, return_roots:bool=False)->Union[float, Tuple[float, float]]: 
+    """This function computes the FW Percentual Max roots of a given signal.
+
+    Args:
+        x (np.array): x-axis representation of the signal
+        y (np.array): y-axis representation of the signal
+        perc (float): The value of the percentage of the max to retrieve.
+        return_roots (bool, optional): whether to return or not return the roots of the half-spline
+
+    Returns:
+        Union[float, Tuple[float, float]]: value, in seconds, of FWHM and, optionally, the roots of the half spline.
+    """
+    perc_signal = y - (perc * y.max())
+    perc_spline = UnivariateSpline(x = x, y = perc_signal, s = 0)
+    
+    r1, r2 = perc_spline.roots()[0], perc_spline.roots()[-1]
+    FWPercM_value = np.abs(np.array((r1, r2))).sum()
+    if return_roots: 
+        return FWPercM_value, (r1, r2)
+    else: 
+        return FWPercM_value
     
 def buildup(time:np.array, intensity:np.array, return_instants=False, min_thresh:float=1e-3) -> Union[float, Tuple[float, float]]: 
     """This function computes the buildup instants for the given signal.
@@ -257,15 +279,44 @@ class PulseEmbedding:
         dx = np.abs(np.diff(time)[0])
         
         I_0 = peak_intensity(pulse_intensity=pulse, w0 = self.w0, E = self.E, dt = dx)
-        FWHM_value, root1, root2 = FWHM(x = time, y = pulse, return_roots = True)
+        FWHM_value, roots = FWHM(x = time, y = pulse, return_roots = True)
+        root1, root2 = roots
+        
+        FW25M, roots25 = FWPercM(x = time, y = pulse, perc = .25, return_roots = True)
+        root1_25, root2_25 = roots25
+        
+        FW75M, roots75 = FWPercM(x = time, y = pulse, perc = .75, return_roots = True)
+        root1_75, root2_75 = roots75
         
         top_mask = (time >= root1) & (time <= root1) & (pulse >= 0.5)
         bottom_mask = ~top_mask
         
         A_total = np.trapz(y = pulse, dx = dx)
-        A_top = np.trapz(np.clip(pulse - 0.5, a_min = 0), dx = dx)
+        A_top = np.trapz(np.clip(pulse - 0.5, a_min = 0, a_max = None), dx = dx)
         A_bottom = A_total - A_top
         
-        buildup_duration, inst1, inst2 = buildup(time = time, intensity = pulse, return_instants = True, min_thresh = self.min_tresh)
+        buildup_duration, istants = buildup(time = time, intensity = pulse, return_instants = True, min_thresh = self.min_thresh)
+        inst1, inst2 = istants
         
-        return np.array((I_0, FWHM_value, root1, root2, A_total, A_top, A_bottom, buildup_duration, inst1, inst2))
+        return np.array((I_0, FWHM_value, root1, root2, FW25M, root1_25, root2_25, FW75M, root1_75, root2_75, A_total, A_top, A_bottom, buildup_duration, inst1, inst2))
+    
+    def embed_Series(self, time:np.array, pulse:np.array) -> pd.Series: 
+        """This function embeds a pulse in a Series for code readibility"""
+        embedded = self.embed(time=time, pulse=pulse)
+        embedded_Series = pd.Series(data = embedded,
+                                  index = [
+                                      "Peak Intensity",
+                                      "FWHM", 
+                                      "FWHM_left", "FWHM_right",
+                                      "FW25M", 
+                                      "FW25M_left", "FW25M_right",
+                                      "FW75M", 
+                                      "FW75M_left", "FW75M_right",
+                                      "Total Area", 
+                                      "Area Under FWHM",
+                                      "Area Above FWHM", 
+                                      "Buildup duration", 
+                                      "Buildup_left", "Buildup_right"
+                                      ]
+                                 )
+        return embedded_Series
