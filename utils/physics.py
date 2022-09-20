@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.fft import fft, ifft, fftfreq, fftshift
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 from scipy.interpolate import UnivariateSpline
 from utils.se import get_project_root
 import pandas as pd
@@ -249,6 +249,7 @@ def peak_intensity(pulse_intensity:np.array, w0:float=12e-3, E:float=220e-3, dt:
     # the integral of the intensity can be approximated from the area under the curve of the pulse.
     I_integral = np.trapz(y = pulse_intensity, dx = dt)
     return (2 * E) / (np.pi * (w0 ** 2) * I_integral)
+
 class PulseEmbedding: 
     def __init__(self, w0:float=12e-3, E:float=220e-3, min_thresh:float=1e-3) -> None: 
         """Init function. 
@@ -300,23 +301,29 @@ class PulseEmbedding:
         
         return np.array((I_0, FWHM_value, root1, root2, FW25M, root1_25, root2_25, FW75M, root1_75, root2_75, A_total, A_top, A_bottom, buildup_duration, inst1, inst2))
     
+    def basic_index(self) -> List: 
+        """Index for Series embedding"""
+        index = [
+                "Peak Intensity",
+                "FWHM", 
+                "FWHM_left", "FWHM_right",
+                "FW25M", 
+                "FW25M_left", "FW25M_right",
+                "FW75M", 
+                "FW75M_left", "FW75M_right",
+                "Total Area", 
+                "Area Above FWHM",
+                "Area Below FWHM", 
+                "Buildup duration", 
+                "Buildup_left", "Buildup_right"
+                ]
+        return index
+
     def embed_Series(self, time:np.array, pulse:np.array) -> pd.Series: 
         """This function embeds a pulse in a Series for code readibility"""
         embedded = self.embed(time=time, pulse=pulse)
-        embedded_Series = pd.Series(data = embedded,
-                                  index = [
-                                      "Peak Intensity",
-                                      "FWHM", 
-                                      "FWHM_left", "FWHM_right",
-                                      "FW25M", 
-                                      "FW25M_left", "FW25M_right",
-                                      "FW75M", 
-                                      "FW75M_left", "FW75M_right",
-                                      "Total Area", 
-                                      "Area Under FWHM",
-                                      "Area Above FWHM", 
-                                      "Buildup duration", 
-                                      "Buildup_left", "Buildup_right"
-                                      ]
-                                 )
+        embedded_Series = pd.Series(
+            data = embedded,
+            index = self.basic_index()
+        )
         return embedded_Series
