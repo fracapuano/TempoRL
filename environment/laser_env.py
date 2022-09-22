@@ -1,10 +1,7 @@
-import re
 import sys
-from typing import Tuple
+from typing import Iterable, Tuple
 import inspect
 import os
-
-from utils.LaserModel_torch import ComputationalLaser
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
@@ -25,7 +22,6 @@ class LaserEnv(gym.Env):
         b:int = 5, 
         action_shape:Tuple[float, ] = (3,), 
         obs_shape:Tuple[float, ] = (16,),
-        max_action_update:float = 2, 
         number_buildups:float = 100.,
         number_FW:float = 100., 
         maximal_timesteps:int = 100) -> None:
@@ -56,6 +52,8 @@ class LaserEnv(gym.Env):
         self.TL_embedding = self.LaserWrapper.transform_limited_embedding()
 
         # TERMINATION CONDITIONS 
+        # 100 times the TL buildup
+        self.buildup_max = number_buildups * self.TL_embedding["Buildup duration"]
         # 100 times the TL FWHM
         self.FWHM_max = number_FW * self.TL_embedding["FWHM"]
         # maximal number of timesteps per episode
@@ -91,8 +89,9 @@ class LaserEnv(gym.Env):
         elif not self.done: 
             reward_peak, penalty_action = self.compute_reward()
             info = {"Reward Peak": reward_peak, "Penalty Action": penalty_action, "Info": self.remaining_steps}
-            alive_bonus = 1
-            reward = reward_peak + alive_bonus - penalty_action
+            alive_bonus = 10
+            reward = 100 * reward_peak + alive_bonus - penalty_action
+            reward = reward.item()
         # return obs, reward, done and info
         return self.state, reward, self.done, info
 
@@ -146,7 +145,7 @@ class LaserEnv(gym.Env):
         self.visited_states = []
         return self.state  # reward, done, info can't be included
 
-    def convert_actions(self): 
+    def convert_actions(self)->Iterable: 
         """This function converts the applied actions into actual controls that can be used in LaserModel. 
         """
         return map(
@@ -154,12 +153,17 @@ class LaserEnv(gym.Env):
             self.applied_actions
         )
     
-    def convert_states(self): 
+    def convert_states(self)->Iterable: 
         """This function converts the visited states so that it is possible to easy interpret them
         """
         return map(lambda s: descale_embedding(s), self.visited_states)
     
-    def convert_TL_embedding(self): 
+    def convert_TL_embedding(self)->pd.Series: 
         """This function converts the TL embedding considered
         """
         return pd.Series(data = descale_embedding(self.TL_embedding.values), index = self.TL_embedding.index)
+
+    def convert_obs(self, state:np.array)->np.array: 
+        """This function converts an input state to descale it
+        """
+        return descale_embedding(state)

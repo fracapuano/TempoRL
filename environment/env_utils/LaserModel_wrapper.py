@@ -1,6 +1,4 @@
 import sys
-import inspect
-import os
 import torch
 import numpy as np
 sys.path.append("../..")
@@ -98,6 +96,11 @@ class LaserWrapper:
         """This function returns the Series corresponding to transform limited pulse.
         """
         time, pulse = self.LaserModel.transform_limited()
+        # when cuda is available .numpy() only works on CPU
+        if torch.cuda.is_available(): 
+            time = time.cpu()
+            pulse = pulse.cpu()
+        
         values = rescale_embedding(self.PulseEmbedder.embed(time = time.numpy(), pulse = pulse.numpy()))
         index = self.PulseEmbedder.basic_index()
         return pd.Series(data = values, index = index)
@@ -119,8 +122,12 @@ class LaserWrapper:
         control_descaled = descale_control(control=control, given_bounds=self.bounds_control, actual_bounds=self.bounds_SI)
         # forward pass - with descaled control
         time, pulse = self.LaserModel.forward_pass(control_descaled)
-        # embedding forward pass 
+        # when cuda is available .numpy() only works on CPU
+        if torch.cuda.is_available(): 
+            time = time.cpu()
+            pulse = pulse.cpu()
         time, pulse = time.numpy(), pulse.numpy()
+        # embedding forward pass 
         output = self.PulseEmbedder.embed(time = time, pulse = pulse)
         
         return rescale_embedding(output)
