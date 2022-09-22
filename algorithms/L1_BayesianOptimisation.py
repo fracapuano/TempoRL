@@ -43,9 +43,10 @@ def extract_data()->Tuple[np.array, np.array]:
 
     frequency, intensity = df.loc[:, "Frequency (THz)"].values, df.loc[:, "Intensity"].values
     # mapping intensity in the 0-1 range
-    intensity = (intensity - intensity.min()) / (intensity.max() - intensity.min())
+    intensity = intensity / intensity.max()
+    field = np.sqrt(intensity)
     
-    return frequency, intensity
+    return frequency, field
 
 def model(frequency, intensity, compressor, b_int, cutoff, num_points = 5000)->object: 
     """

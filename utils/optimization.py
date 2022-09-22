@@ -1,9 +1,12 @@
 import numpy as np
 from numpy.linalg import norm
-from numerical_diff import *
+from utils.numerical_diff import *
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import gmres
 from typing import Tuple
+import torch
+from torch.linalg import norm
+from tqdm import tqdm
 
 def find_alpha(
     f, 
@@ -233,6 +236,96 @@ def plot_gradient_norm(dim:int=10):
     ax.legend()
 
     plt.show()
+
+class PenalizedFunction: 
+    def __init__(self, f, bounds:torch.tensor, penalty_term:torch.tensor):
+        """Init function takes only penalty term (to be updated during optimisation) and bounds.
+        """
+        self.f = f
+        self.bounds = bounds
+        self.epsilon = penalty_term
+    
+    def evaluate(self, x:torch.tensor) -> torch.tensor: 
+        """
+        This function returns the penalized version of the objective function considering input bounds. 
+        """
+        # minus(lb)-plud(ub) the input array
+        pm_input = torch.hstack(list(map(lambda component: torch.stack((-component, component)), x)))
+        # reshaping so as to have lower bound/upper bound/lower bound/...
+        bounds = self.bounds.reshape(-1)
+        # multiplying so as to have +lower bound/-upper bound/+lower bound/ ...
+        multipliers = torch.empty_like(bounds)
+        multipliers[::2] = 1; multipliers[1::2] = -1
+        bounds = bounds * multipliers
+        # summing component-wise input and corresponding bound to obtain square violation
+        violations = torch.max(torch.zeros_like(bounds), pm_input + bounds) ** 2
+        return self.f(x) + (1/self.epsilon) * violations.sum()
+    
+    def evaluate_root(self, x:torch.tensor) -> torch.tensor: 
+        """
+        This function returns the penalized version of the objective function considering input bounds. 
+        """
+        # minus(lb)-plud(ub) the input array
+        pm_input = torch.hstack(list(map(lambda component: torch.stack((-component, component)), x)))
+        # reshaping so as to have lower bound/upper bound/lower bound/...
+        bounds = self.bounds.reshape(-1)
+        # multiplying so as to have +lower bound/-upper bound/+lower bound/ ...
+        multipliers = torch.empty_like(bounds)
+        multipliers[::2] = 1; multipliers[1::2] = -1
+        bounds = bounds * multipliers
+        # summing component-wise input and corresponding bound to obtain violation
+        violations = torch.max(torch.zeros_like(bounds), pm_input + bounds)
+        return self.f(x) + (1/self.epsilon) * violations.sum()
+      
+    def optimize(self, 
+                 x0:torch.tensor, 
+                 maxit:int=int(1e3), 
+                 tolgrad:float=1e-6, 
+                 eta_0:float=1,
+                 eps:float=1e-3,
+                 square:bool=True) -> Tuple[torch.tensor, torch.tensor]: 
+        """
+        This function optimises the unconstrained (penalized) objective function
+        """
+        # the objective function is the penalized one 
+        f = self.evaluate if square else self.evaluate_root
+        k = 0
+        xk = x0.requires_grad_(True)
+        # giving gradient to xk
+        f(xk).backward()
+
+        points = torch.zeros(size = (maxit, len(xk)))
+        grads = torch.zeros(maxit)
+
+        grad_k = xk.grad
+        
+        sum_grad_squared = grad_k ** 2
+        lr = eta_0 / torch.sqrt(eps + sum_grad_squared)
+
+        for k in (pbar := tqdm(range(maxit))): 
+            # store & display information
+            points[k, :] = xk.detach()
+            grads[k] = norm(grad_k)
+            pbar.set_description("It. {} - f(xk) value {:4e}".format(k+1, f(xk).detach().numpy()))
+            # update position
+            xk = (xk.double() - lr.double() * grad_k.double()).detach().requires_grad_(True)
+            # compute gradient at new position
+            f(xk).backward()
+            grad_k = xk.grad
+            # adapt learning rate
+            sum_grad_squared += grad_k ** 2
+            lr = eta_0 / torch.sqrt(eps + sum_grad_squared)
+            # reiterate (if not converged)
+            if norm(grad_k) <= tolgrad: 
+                points = points[:, :k]
+                grads = grads[:k]
+                break
+            else: 
+                k += 1
+                # increasing the penalty as iterate progress
+                self.epsilon *= .9999
+                continue
+        return points.detach(), grads
 
 def main(): 
     plot_gradient_norm(dim=2)
