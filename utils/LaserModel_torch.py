@@ -146,7 +146,7 @@ class ComputationalLaser:
         else: 
             return time, intensity_time if cuda_available else intensity_time.cpu()
         
-    def forward_pass(self, control:torch.tensor)->torch.tensor: 
+    def forward_pass(self, control:torch.tensor)->Tuple[torch.tensor, torch.tensor]: 
         """This function performs a forward pass in the model using control values stored in control.
 
         Args:
