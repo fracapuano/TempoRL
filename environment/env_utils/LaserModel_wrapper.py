@@ -2,34 +2,10 @@ import sys
 import torch
 import numpy as np
 sys.path.append("../..")
-from utils.se import extract_data
+
+from utils.physics_torch import instantiate_laser
 from utils.physics import *
 from utils.LaserModel_torch import ComputationalLaser as CL
-
-def instatiate_laser()->object: 
-    """This function instantiates a Laser Model object based on usual specifications.
-
-    Returns:
-        object: LaserModel v2 object.
-    """
-    frequency, field = extract_data()
-    # preprocessing
-    cutoff = np.array((289.95, 291.91)) * 1e12
-    # cutting off the signal
-    frequency_clean, field_clean = cutoff_signal(frequency_cutoff = cutoff, frequency = frequency * 1e12,
-                                                signal = field)
-    # augmenting the signal
-    frequency_clean_aug, field_clean_aug = equidistant_points(frequency = frequency_clean,
-                                                            signal = field_clean,
-                                                            num_points = int(3e3)) # n_points defaults to 5e3
-    # retrieving central carrier
-    central_carrier = central_frequency(frequency = frequency_clean_aug, signal = field_clean_aug)
-    intensity = torch.from_numpy(field ** 2)
-    frequency, field = torch.from_numpy(frequency_clean_aug), torch.from_numpy(field_clean_aug)
-    compressor_params = -1 * torch.tensor([267.422 * 1e-24, -2.384 * 1e-36, 9.54893 * 1e-50], dtype = torch.double)
-
-    laser = CL(frequency = frequency * 1e-12, field = field, compressor_params = compressor_params)
-    return laser
 
 def descale_control(control:torch.tensor, given_bounds:torch.tensor, actual_bounds:torch.tensor)->torch.tensor: 
     r"""This function minmax-descales the control array in the range of "given bounds" $[a, b]$ to the "actual bounds" $[min, max]$ range.
@@ -75,7 +51,7 @@ def descale_embedding(embedding:np.array)->np.array:
 
 class LaserWrapper: 
     def __init__(self, a = -5, b = 5, w0:float=12e-3, E:float=220e-3, min_thresh:float=1e-3):
-        self.LaserModel = instatiate_laser()
+        self.LaserModel = instantiate_laser()
         self.PulseEmbedder = PulseEmbedding(w0=w0, E=E, min_thresh=min_thresh)
         self.a = a; self.b = b
         
