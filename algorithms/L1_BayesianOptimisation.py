@@ -4,6 +4,7 @@ This script performs Bayesian Optimisation to optimize pulse shape.
 Author: Francesco Capuano, ELI-beamlines intern, Summer 2022. 
 """
 # these imports are necessary to import modules from directories one level back in the folder structure
+from multiprocessing.sharedctypes import Value
 import sys
 import os
 from typing import Tuple
@@ -27,10 +28,13 @@ from bayes_opt import BayesianOptimization
 def parse_args()->None: 
     parser = argparse.ArgumentParser()
     parser.add_argument("--training-file", default="BayesianControl.txt", type=str, help="filename to store training information")
-    parser.add_argument("--fname", default="BayesControl.mp4", type=str, help="filename to be used to store the visualization")
-    parser.add_argument("--render", default=False, type=bool, help="Whether or not to render the training process once observed")
+    parser.add_argument("--controls-fname", default="Controls_BayesControl.mp4", type=str, help="filename to be used to store the visualization")
+    parser.add_argument("--pulses-fname", default="Pulses_BayesControl.mp4", type=str, help="filename to be used to store the visualization")
+    parser.add_argument("--render-training", default=False, type=bool, help="Whether or not to render the training process once observed")
     parser.add_argument("--render-output", default=True, type=bool, help="Whether or not to plot the final control")
     parser.add_argument("--save-anim", default=True, type=bool, help="Whether or not to save the animation")
+    parser.add_argument("--render-pulses", default=True, type=bool, help="Whether or not to render pulses observed")
+    parser.add_argument("--render-controls", default=True, type=bool, help="Whether or not to render controls applied")
     return parser.parse_args()
 
 args = parse_args()
@@ -116,25 +120,29 @@ def main()->None:
         fig, ax = plt.subplots()
         ax.set_title("Pulse Optimization results", fontsize = 12, fontweight = "bold")
         
-        ax.plot(time_BO, np.roll(profile_BO, - np.argmax(profile_BO) + np.argmax(losses.target_profile)), label = "Bayesian Optimization output", lw = 2.5)
+        ax.plot(time_BO, np.roll(profile_BO, - np.argmax(profile_BO) + np.argmax(losses.target_profile)), label = "Bayesian Optimization\noutput", lw = 2.5)
         ax.scatter(losses.target_time, losses.target_profile, label = "Target Pulse", c = "tab:grey", marker = "x", s = 50)
 
         ax.set_xlabel("Time (s)", fontsize = 12); ax.set_ylabel("Intensity", fontsize = 12)
 
-        ax.legend(fontsize = 12)
+        ax.legend(loc = "upper right", fontsize = 12, framealpha=1.)
         ax.set_xlim(left = -8e-12, right = 8e-12)
         fig.tight_layout()
     
     print("Final Loss between Control and Target: {:.4e}".format(mse(x = losses.target_profile, y = profile_BO)))
 
-    if args.render: # whether or not to render the training process
+    if args.render_training: # whether or not to render the training process
         applied_controls = np.loadtxt(f"../trainings/{args.training_file}")
         applied_controls = np.array(list(map(lambda control: l1_pump.translate_control(control, verse = "to_gdd"), applied_controls)))
         
         lw = LaserWrapper()
         animator = AnimateActions(performed_actions=applied_controls, laser_wrapper=lw, last_actions=10)
-        
-        animator.animate_controls(save_anim = args.save_anim, fname = f"../media/{args.fname}")
+        if args.render_pulses is False and args.render_controls is False: 
+            raise ValueError("Rendering of pulses and controls can't be False at the same time.")
+        if args.render_pulses:
+            animator.animate_actions(show_target = True, save_anim = args.save_anim, fname = f"../media/{args.pulses_fname}")
+        if args.render_controls:
+            animator.animate_controls(save_anim = args.save_anim, fname = f"../media/{args.controls_fname}")
     
     plt.show()
     
