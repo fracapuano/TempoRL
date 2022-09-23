@@ -79,12 +79,7 @@ def amplification(frequency:np.array, field:np.array, n_passes:int=50, num_point
             num_points = num_points
         )
         
-        amp_field = yb_field * field
-
-        for _ in range(1, n_passes): 
-            amp_field *=  yb_field
-        
-        return amp_field
+        return field * (yb_field ** n_passes)
 
 def central_frequency(frequency:np.array, signal:np.array) -> float: 
     """This function computes the central frequency of a given signal. 
@@ -250,6 +245,30 @@ def peak_intensity(pulse_intensity:np.array, w0:float=12e-3, E:float=220e-3, dt:
     I_integral = np.trapz(y = pulse_intensity, dx = dt)
     return (2 * E) / (np.pi * (w0 ** 2) * I_integral)
 
+def extract_data()->Tuple[np.array, np.array]: 
+    """This function extracts the desired information from the data file given.
+    
+    Returns: 
+        Tuple[np.array, np.array]: Frequency (in THz) and Intensity arrays.
+
+    """
+    data_path = str(get_project_root()) + "/data/L1_pump_spectrum.csv"
+    # read the data
+    df = pd.read_csv(data_path, header = None)
+    df.columns = ["Wavelength (nm)", "Intensity"]
+    # converting Wavelength (nm) to Frequency (Hz)
+    df["Frequency (THz)"] = df["Wavelength (nm)"].apply(lambda wavelenght: 1e-12 * (c/(wavelenght * 1e-9)))
+    # clipping everything that is negative - measurement error
+    df["Intensity"] = df["Intensity"].apply(lambda intensity: np.clip(intensity, a_min = 0, a_max = None))
+    # the observations must be returned for increasing values of frequency
+    df = df.sort_values(by = "Frequency (THz)")
+
+    frequency, intensity = df.loc[:, "Frequency (THz)"].values, df.loc[:, "Intensity"].values
+    # mapping intensity in the 0-1 range
+    intensity = intensity / intensity.max()
+    field = np.sqrt(intensity)
+    
+    return frequency, field
 class PulseEmbedding: 
     def __init__(self, w0:float=12e-3, E:float=220e-3, min_thresh:float=1e-3) -> None: 
         """Init function. 
