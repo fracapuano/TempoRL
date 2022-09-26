@@ -4,7 +4,6 @@ from typing import Tuple
 from scipy.constants import c
 from utils.torch_utils import iterable_to_cuda
 from utils.physics import *
-from utils.LaserModel_torch import ComputationalLaser as CL
 
 cuda_available = torch.cuda.is_available()
 
@@ -132,28 +131,3 @@ def temporal_profile(frequency:torch.tensor, field:torch.tensor, npoints_pad:int
         return intensity_time if cuda_available else intensity_time.cpu()
     else: 
         return time, intensity_time
-
-def instantiate_laser()->object: 
-    """This function instantiates a Laser Model object based on usual specifications.
-
-    Returns:
-        object: LaserModel v2 object.
-    """
-    frequency, field = extract_data()
-    # preprocessing
-    cutoff = np.array((289.95, 291.91)) * 1e12
-    # cutting off the signal
-    frequency_clean, field_clean = cutoff_signal(frequency_cutoff = cutoff, frequency = frequency * 1e12,
-                                                signal = field)
-    # augmenting the signal
-    frequency_clean_aug, field_clean_aug = equidistant_points(frequency = frequency_clean,
-                                                            signal = field_clean,
-                                                            num_points = int(3e3)) # n_points defaults to 5e3
-    # retrieving central carrier
-    central_carrier = central_frequency(frequency = frequency_clean_aug, signal = field_clean_aug)
-    intensity = torch.from_numpy(field ** 2)
-    frequency, field = torch.from_numpy(frequency_clean_aug), torch.from_numpy(field_clean_aug)
-    compressor_params = -1 * torch.tensor([267.422 * 1e-24, -2.384 * 1e-36, 9.54893 * 1e-50], dtype = torch.double)
-
-    laser = CL(frequency = frequency * 1e-12, field = field, compressor_params = compressor_params)
-    return laser

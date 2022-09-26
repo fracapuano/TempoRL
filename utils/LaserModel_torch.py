@@ -2,8 +2,8 @@
 This script reproduces a semi-physical model for a pump-laser. 
 Author: Francesco Capuano, Summer 2022 S17 Intern @ ELI beam-lines, Prague.
 """
-from dataclasses import field
 from utils import physics_torch as pt
+from utils.physics import *
 # these imports are necessary to import modules from directories one level back in the folder structure
 import sys
 import os
@@ -23,6 +23,31 @@ import pandas as pd
 from utils import physics as p
 
 cuda_available = torch.cuda.is_available()
+
+def instantiate_laser()->object: 
+    """This function instantiates a Laser Model object based on usual specifications.
+
+    Returns:
+        object: LaserModel v2 object.
+    """
+    frequency, field = extract_data()
+    # preprocessing
+    cutoff = np.array((289.95, 291.91)) * 1e12
+    # cutting off the signal
+    frequency_clean, field_clean = cutoff_signal(frequency_cutoff = cutoff, frequency = frequency * 1e12,
+                                                signal = field)
+    # augmenting the signal
+    frequency_clean_aug, field_clean_aug = equidistant_points(frequency = frequency_clean,
+                                                            signal = field_clean,
+                                                            num_points = int(3e3)) # n_points defaults to 5e3
+    # retrieving central carrier
+    central_carrier = central_frequency(frequency = frequency_clean_aug, signal = field_clean_aug)
+    intensity = torch.from_numpy(field ** 2)
+    frequency, field = torch.from_numpy(frequency_clean_aug), torch.from_numpy(field_clean_aug)
+    compressor_params = -1 * torch.tensor([267.422 * 1e-24, -2.384 * 1e-36, 9.54893 * 1e-50], dtype = torch.double)
+
+    laser = ComputationalLaser(frequency = frequency * 1e-12, field = field, compressor_params = compressor_params)
+    return laser
 
 class ComputationalLaser: 
     def __init__(
