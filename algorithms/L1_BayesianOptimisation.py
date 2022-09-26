@@ -4,7 +4,6 @@ This script performs Bayesian Optimisation to optimize pulse shape.
 Author: Francesco Capuano, ELI-beamlines intern, Summer 2022. 
 """
 # these imports are necessary to import modules from directories one level back in the folder structure
-from multiprocessing.sharedctypes import Value
 import sys
 import os
 from typing import Tuple
