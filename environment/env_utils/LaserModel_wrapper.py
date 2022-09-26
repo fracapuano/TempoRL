@@ -3,9 +3,9 @@ import torch
 import numpy as np
 sys.path.append("../..")
 
-from utils.physics_torch import instantiate_laser
 from utils.physics import *
 from utils.LaserModel_torch import ComputationalLaser as CL
+from utils.LaserModel_torch import instantiate_laser
 
 def descale_control(control:torch.tensor, given_bounds:torch.tensor, actual_bounds:torch.tensor)->torch.tensor: 
     r"""This function minmax-descales the control array in the range of "given bounds" $[a, b]$ to the "actual bounds" $[min, max]$ range.
