@@ -86,7 +86,7 @@ class Losses:
 
         self.tol = 1e-6 # zero tolerance
     
-    def  loss1(self, x:np.array,)->float: 
+    def loss1(self, x:np.array,)->float: 
         """This function implements the first loss, i.e. a weighted squared error where the weights are the intensity values considered.
 
         Args:

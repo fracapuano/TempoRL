@@ -3,6 +3,7 @@ import torch
 from typing import Tuple
 from scipy.constants import c
 from utils.torch_utils import iterable_to_cuda
+from utils.physics import *
 
 cuda_available = torch.cuda.is_available()
 
