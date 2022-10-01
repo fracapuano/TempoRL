@@ -103,7 +103,13 @@ class LaserModel:
         """
         frequency, field = self.spit_center()
         phase = np.zeros_like(frequency)
-        time, intensity_TL = temporal_profile(frequency = frequency, field = field, phase = phase, npoints_pad = self.pad_points, return_time=True)
+        time, intensity_TL = temporal_profile(
+            frequency = frequency, 
+            field = self.yb_amplification(field),
+            phase = phase,
+            npoints_pad = self.pad_points, 
+            return_time=True
+            )
         return time, intensity_TL
 
     def get_field(self): 
@@ -279,3 +285,28 @@ class LaserModel:
         # obtaining FROG in time
         time, self.y3_time = self.FROG()
         return time, self.y3_time
+    
+    def yb_amplification(self, signal:np.array, n_passes:int=50)->np.array: 
+        """This function models the passage of the signal in the cristal in which yb:yab gain is observed.
+        
+        Args: 
+            signal (np.array): The electric field signal that enters the system considered.
+            intensity_yb (torch.tensor): The gain intensity of the crystal
+            n_passes (int, optional): The number of times the beam passes through the crystal where spectrum narrowing is observed. 
+            
+        Returns: 
+            torch.tensor: New spectrum, narrower because of the gain. 
+        """
+        # cutting the gain frequency accordingly
+        yb_frequency, yb_field = cutoff_signal(
+            frequency_cutoff=(self.frequency[0], self.frequency[-1]), 
+            frequency = self.yb_frequency * 1e-12, 
+            signal = self.yb_field)
+        
+        # augmenting the cutted data
+        yb_frequency, yb_field = equidistant_points(
+            frequency = yb_frequency, 
+            signal = yb_field, 
+            num_points = self.num_points
+        )
+        return signal * (yb_field ** n_passes)
