@@ -80,7 +80,7 @@ class Losses:
 
         self.target_time, self.target_profile = physics.temporal_profile(
             frequency_clean, 
-            physics.amplification(frequency_clean, field_clean),
+            physics.amplification(frequency_clean, field_clean, num_points=self.laser.num_points),
             phase = np.zeros_like(frequency_clean), 
             npoints_pad = self.laser.pad_points)
 
