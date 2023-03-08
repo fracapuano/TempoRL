@@ -51,9 +51,15 @@ def instantiate_laser()->object:
 
 class ComputationalLaser: 
     def __init__(
-                self, frequency:torch.tensor, field:torch.tensor, compressor_params:Tuple[float, float, float],
-                num_points_padding:int=int(3e4), B:float=2, central_frequency:float=(c/(1030*1e-9)), 
-                cristal_frequency:torch.tensor=None, cristal_intensity:torch.tensor=None
+                self, 
+                frequency:torch.tensor, 
+                field:torch.tensor, 
+                compressor_params:Tuple[float, float, float],
+                num_points_padding:int=int(3e4), 
+                B:float=2, 
+                central_frequency:float=(c/(1030*1e-9)), 
+                cristal_frequency:torch.tensor=None, 
+                cristal_intensity:torch.tensor=None
                 ) -> None:
         """Init function. 
         This model is initialized for a considered intensity in the frequency domain signal. The signal is assumed to be already cleaned. 
@@ -130,7 +136,8 @@ class ComputationalLaser:
         """This function returns the phase with respect to the frequency and some control parameters.
 
         Args:
-            control (torch.tensor): Control parameters to be used to create the phase. It contains GDD, TOD and FOD in s^2, s^3 and s^4.
+            control (torch.tensor): Control parameters to be used to create the phase. 
+                                    It contains GDD, TOD and FOD in s^2, s^3 and s^4.
 
         Returns:
             torch.tensor: The phase with respect to the frequency, measured in radiants.
