@@ -6,7 +6,18 @@ from utils.se import get_project_root
 import pandas as pd
 from scipy.constants import c
 
-import matplotlib.pyplot as plt
+def yb_gain(signal:np.array, intensity_yb:np.array, n_passes:int=50)->np.array: 
+    """This function models the passage of the signal in the cristal in which yb:yab gain is observed.
+    
+    Args: 
+        signal (np.array): The intensity signal that enters the system considered.
+        intensity_yb (np.array): The gain intensity of the crystal
+        n_passes (int, optional): The number of times the beam passes through the crystal where spectrum narrowing is observed. 
+        
+    Returns: 
+        np.array: New spectrum, narrower because of the gain. 
+    """
+    return signal * (intensity_yb ** n_passes)
 
 def cutoff_signal(frequency_cutoff:Tuple[float, float], frequency:np.array, signal:np.array) -> Tuple[np.array, np.array]:
     """This function cuts the input signal using input frequency cutoff. It returns the cutted signal. The cut is done so as to discard
@@ -44,6 +55,21 @@ def equidistant_points(frequency:np.array, signal:np.array, num_points:int=int(5
     equidistant_frequency = np.linspace(start = frequency.min(), stop = frequency.max(), num = num_points)
 
     return (equidistant_frequency, spline(equidistant_frequency))
+
+def time_from_frequency(frequency:np.array, pad_points: int) -> np.array:
+    """This function generates a temporal vector based on the frequency vector and the ammount of zero padded points.
+
+    Args:
+        frequency (np.array): Array of frequencies considered measured in THz.
+        pad_points (np.array): The ammount of zero padded points.
+
+    Returns:
+        np.array: Equidistant array of time 
+    """
+    step = np.diff(frequency)[0]
+    Dt = 1 / step
+    time =  np.linspace(start = -Dt/2, stop = +Dt/2, num = pad_points + len(frequency))    
+    return time
 
 def amplification(frequency:np.array, field:np.array, n_passes:int=50, num_points:int=int(5e3)) -> np.array: 
         r"""This function reproduces the effect that passing through a non-linear cristal has on the beam itself. In particular, this function applies
@@ -146,10 +172,7 @@ def temporal_profile(frequency:np.array, field:np.array, phase:np.array, npoints
     Returns:
         Tuple[np.array, np.array]: Returns either (time, intensity) (with time measured in in femtoseconds) or intensity only.
     """
-    step = np.diff(frequency)[0]
-    Dt = 1/step
-    time = np.linspace(start = -Dt/2, stop = +Dt/2, num = npoints_pad + len(frequency))
-
+    time = time_from_frequency(frequency, npoints_pad)
     field_padded = np.pad(field, pad_width=(npoints_pad // 2, npoints_pad // 2), mode = "constant", constant_values = (0, 0))
     phase_padded = np.pad(phase, pad_width=(npoints_pad // 2, npoints_pad // 2), mode = "constant", constant_values = (0, 0))
 

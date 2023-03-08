@@ -1,5 +1,5 @@
 """ 
-This script performs Bayesian Optimisation to optimize pulse shape.
+This script performs Differential Evolution to optimize pulse shape.
 
 Author: Francesco Capuano, ELI-beamlines intern, Summer 2022. 
 """
