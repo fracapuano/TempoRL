@@ -1,169 +1,158 @@
 import sys
-from typing import Iterable, Tuple
 import inspect
 import os
+from typing import Iterable
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
-from .env_utils.LaserModel_wrapper import *
+import torch
+from utils.LaserModel_torch import ComputationalLaser
+from utils.physics import *
 
-import gym
-from gym import spaces
+import gymnasium as gym
 
-class LaserEnv(gym.Env):
-    """Custom Environment implementing Laser Model that follows gym interface"""
-    metadata = {'render.modes': ['human']}
+def instantiate_laser(
+        compressor_params:Iterable[float], 
+        B_integral:float
+        )->object: 
+    """This function instantiates a Laser Model object based on a given parametrization (in terms of B integral and 
+    compressor params).
 
-    def __init__(
-        self, 
-        a:int = -5, 
-        b:int = 5, 
-        action_shape:Tuple[float, ] = (3,), 
-        obs_shape:Tuple[float, ] = (16,),
-        number_buildups:float = 100.,
-        number_FW:float = 100., 
-        maximal_timesteps:int = 100) -> None:
-        """This function initializes the environment. Input to this function are the lower (a) and upper (b) fictional bounds
-        to express action space.
-        """
-        super(LaserEnv, self).__init__()
-        self.a, self.b = a, b
-        self.action_shape = action_shape
-        self.obs_shape = obs_shape
+    Returns:
+        object: LaserModel-v2 object.
+    """
+    frequency, field = extract_data()  # extracts the data about input spectrum from data folde
+    cutoff = np.array((289.95, 291.91)) * 1e12  # defines cutoff frequencies
+    # cutting off the signal
+    frequency_clean, field_clean = cutoff_signal(frequency_cutoff = cutoff, 
+                                                 frequency = frequency * 1e12,
+                                                 signal = field)
+    # augmenting the signal (using splines)
+    frequency_clean_aug, field_clean_aug = equidistant_points(frequency = frequency_clean,
+                                                              signal = field_clean)  # n_points defaults to 5e3
+    # retrieving central carrier
+    central_carrier = central_frequency(frequency = frequency_clean_aug, signal = field_clean_aug)
+    frequency, field = torch.from_numpy(frequency_clean_aug), torch.from_numpy(field_clean_aug)
 
-        self.LaserWrapper = LaserWrapper(a = self.a, b = self.b)
-        
-        # defining continous action space
-        self.action_space = spaces.Box(low = self.a, high = self.b, shape = self.action_shape)
-        
-        # defining continous observation space
-        self.observation_space = spaces.Box(
-            low = np.full(self.obs_shape, -float('inf'), dtype=np.float32), 
-            high = np.full(self.obs_shape, +float('inf'), dtype=np.float32),
-            shape = self.obs_shape
-            )
-        
-        # initial state
-        self.state = self.random_state()
-
-        # transform limited characteristics
-        self.TL_embedding = self.LaserWrapper.transform_limited_embedding()
-
-        # TERMINATION CONDITIONS 
-        # 100 times the TL buildup
-        self.buildup_max = number_buildups * self.TL_embedding["Buildup duration"]
-        # 100 times the TL FWHM
-        self.FWHM_max = number_FW * self.TL_embedding["FWHM"]
-        # maximal number of timesteps per episode
-        self.maximal_timesteps = maximal_timesteps
-        self.remaining_steps = maximal_timesteps
-
-        # States and Actions Log
-        self.visited_states = []
-        self.applied_actions = []
-        self.done = False
+    laser = ComputationalLaser(
+        # laser specific parameters
+        frequency = frequency * 1e-12, 
+        field = field, 
+        central_frequency=central_carrier,
+        # environment parametrization
+        compressor_params = compressor_params,
+        B=B_integral)
     
-    def step(self, action:np.array)->Tuple[np.array, float, bool, dict]:
-        # converting action to tensor
-        action = torch.from_numpy(action)
-        # storing current state - column vectors
-        self.visited_states.append(self.state.reshape(-1,))
-        # applying action and updating the state
-        self.state = self.LaserWrapper.forward_pass(action)
-        # storing applied action - column vectors
-        self.applied_actions.append(action.reshape(-1,))
-        # reduce remaining timesteps
-        self.remaining_steps -= 1
-        # evaluate completion at current state
-        self.done = self.evaluate_completion()
-        # obtain reward
-        if self.done: 
-            info = {"Buildup condition": self.buildup_condition, "FWHM condition": self.FWHM_condition, "Available Timesteps": self.remaining_steps}
-            if self.remaining_steps <= 0: 
-                reward = 0
-            else:
-                reward = -5 # penalization for failing
-        
-        elif not self.done: 
-            reward_peak, penalty_action = self.compute_reward()
-            info = {"Reward Peak": reward_peak, "Penalty Action": penalty_action, "Info": self.remaining_steps}
-            alive_bonus = 10
-            reward = 100 * reward_peak + alive_bonus - penalty_action
-            reward = reward.item()
-        # return obs, reward, done and info
-        return self.state, reward, self.done, info
+    return laser
 
-    def compute_reward(self)->Tuple[float, float]: 
-        """This function evaluates the current state and returns elements of the reward function. 
-
-        Returns:
-            Tuple[float, float]: Peak Intensity Reward, Area Reward
+class LaserEnv(gym.Env): 
+    """Custom gymnasium env for L1 Laser Pump"""
+    def __init__(self, 
+                 bounds:torch.tensor, 
+                 compressor_params:torch.tensor,
+                 B_integral:float, 
+                 render_mode:str=None):
+        """Init function. Here laser-oriented characteristics are defined.
+        Args: 
+            bounds (torch.tensor): GDD, TOD and FOD upper and lower bounds. Shape must be (3x2). Values must be
+                                   expressed in SI units (i.e., s^2, s^3 and s^4).
+            compressor_params (torch.tensor): \alpha_{GDD}, \alpha_{TOD}, \alpha_{FOD} of laser compressor. If no 
+                                              non-linear effects were to take place, one would have that optimal control
+                                              parameters would be exactly equal to -compressor_params.
+            B_integral (float): B_integral value. This parameter models non-linear phase accumulation. The larger, 
+                                          the higher the non-linearity introduced in the model.
+            render_mode (str, optional): Render mode. Defaults to None.
         """
-        transform_limited_I0 = self.TL_embedding["Peak Intensity"]
-        if len(self.applied_actions) == 1: 
-            penalty_action = 0
-        else: 
-            previous_action, last_action = self.applied_actions[-2:]
-            penalty_action = (((last_action - previous_action) / previous_action) ** 2).sum()
-        # Peak Intensity: 0
-        reward_peak = self.state[0] / transform_limited_I0
-        
-        return reward_peak, penalty_action
 
-    def evaluate_completion(self)->bool: 
-        """This function evaluates an input state to conclude whether or not completion is observed at current state.
+        self._bounds = bounds
+        self._compressor_params = compressor_params
+        self._B = B_integral
+        self.render_mode = render_mode
 
-        Returns:
-            bool: Whether or not the episode is complete. 
-        """
-        # convert state to indexed series (for code readibility)
-        state_series = pd.Series(data = self.state, index = self.TL_embedding.index)
-        
-        self.buildup_condition = state_series["Buildup duration"] >= self.buildup_max
-        self.FWHM_condition = state_series["FWHM"] >= self.FWHM_max
-
-        if self.buildup_condition or self.FWHM_condition or self.remaining_steps <= 0:
-            return True
-        else: 
-            return False
-
-    def random_state(self): 
-        """This function draws a random control from the action state to initialize the state.
-        """
-        random_action = self.action_space.sample()
-        return self.LaserWrapper.forward_pass(control = torch.from_numpy(random_action))
-
-    def reset(self):
-        """This function resets the env when failing is observed.
-        """
-        self.done = False
-        self.remaining_steps = self.maximal_timesteps
-        self.state = self.random_state()
-        self.applied_actions = []
-        self.visited_states = []
-        return self.state  # reward, done, info can't be included
-
-    def convert_actions(self)->Iterable: 
-        """This function converts the applied actions into actual controls that can be used in LaserModel. 
-        """
-        return map(
-            lambda control: descale_control(control = control, given_bounds = self.LaserWrapper.bounds_control, actual_bounds = self.LaserWrapper.bounds_SI), 
-            self.applied_actions
+        self._laser = instantiate_laser(
+            compressor_params=self._compressor_params, 
+            B_integral=self._B
         )
-    
-    def convert_states(self)->Iterable: 
-        """This function converts the visited states so that it is possible to easy interpret them
-        """
-        return map(lambda s: descale_embedding(s), self.visited_states)
-    
-    def convert_TL_embedding(self)->pd.Series: 
-        """This function converts the TL embedding considered
-        """
-        return pd.Series(data = descale_embedding(self.TL_embedding.values), index = self.TL_embedding.index)
+        # initial condition should be GDD, TOD and FOD of compressor with opposite sign
+        self.GDD, self.TOD, self.FOD = -1 * self._compressor_params
+        # STATES: FROG TRACE
+        # make sure parameters_to_frog is a method of Computational Laser...
+        self._observation = None
+        # self._observation = parameters_to_frog_trace([self.GDD, self.TOD, self.FOD])
 
-    def convert_obs(self, state:np.array)->np.array: 
-        """This function converts an input state to descale it
-        """
-        return descale_embedding(state)
+        # COMMENT: ACTIONS MIGHT BE CONSIDERED AS DELTAS FROM A GIVEN SET MASKING SOME VALUES OUT - THIS INTRODUCES 
+        #          MASKING (WHICH MAKES THINGS HARDER) BUT CLEANS UP TRAINING PHASE. 
+        #          OTHERWISE ONE COULD USE LARGELY NEGATIVE REWARD FOR TOO LARGE UPDATES.  
+        # OPEN QUESTIONS: SINCE FROG TRACE DIRECTLY DERIVE FROM PARAMETERS, WHY NOT USING THE PARAMETERS THEMSELVES 
+        #                 AS OBSERVATIONS?HOW WOULD YOU MASK IN CONTINOUS PROBLEMS? MAYBE WITH PADDING PROB. 
+        #                 DISTRIBUTIONS?
+        # ~: ASK GABRI
+    
+    @property
+    def laser(self)->object:
+        """Returns Laser object"""
+        return self._laser
+    
+    @property
+    def B(self)->float: 
+        """Returns private value of B integral"""
+        return self._B
+    
+    @property
+    def compressor_params(self)->torch.tensor: 
+        """Returns compressor params for laser"""
+        return self._compressor_params
+
+    @B.setter
+    def update_B(self, new_B:int)->None: 
+        """Updates the value of B integral. When updating, also updates the laser changing the value
+        of laser's B."""
+
+        if not new_B > 0:
+            raise ValueError(f"B integral must be > 0! Prompted {new_B}")
+        # updates env
+        self._B = new_B
+        # updates the simulator
+        self._laser.B = new_B
+
+    @compressor_params.setter
+    def update_compressor(self, new_params:torch.tensor)->None: 
+        """Updates compressor parameters value with new set of values."""
+        # updates env
+        self._compressor_params = new_params
+        # updates the simulator
+        self._laser.compressor_params = new_params
+    
+    def _get_obs(self)->dict: 
+        """Returns observation"""
+        return self._observation
+    
+    def _get_info(self)->dict:
+        """Returns info dicionary"""
+        info = None  # for now, must be filled up with information about the phenomenon evolution
+
+    def reset(self)->None: 
+        """Resets the environment to initial observations"""
+        self.GDD, self.TOD, self.FOD = -1 * self.compressor_params
+        return self._get_obs() , self._get_info()
+    
+    def step(self, action:torch.tensor):
+        """Applyies given action on laser env. Applying an action coincides with using it for
+        controlling the actual laser."""
+
+        # for now, does nothing and simply retrieves the temporal axis and profile given the present set
+        # of parameters
+        psi = torch.tensor([self.GDD, self.TOD, self.FOD])
+        observation = self._laser.forward_pass(control=psi)
+        
+        reward = None
+        done = False
+        info = self._get_info()
+        
+        return observation, reward, done, info
+    
+    def render(self):
+        # how to render?? Rendering is going to be super useful :))
+        pass
