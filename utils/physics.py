@@ -6,7 +6,18 @@ from utils.se import get_project_root
 import pandas as pd
 from scipy.constants import c
 
-import matplotlib.pyplot as plt
+def yb_gain(signal:np.array, intensity_yb:np.array, n_passes:int=50)->np.array: 
+    """This function models the passage of the signal in the cristal in which yb:yab gain is observed.
+    
+    Args: 
+        signal (np.array): The intensity signal that enters the system considered.
+        intensity_yb (np.array): The gain intensity of the crystal
+        n_passes (int, optional): The number of times the beam passes through the crystal where spectrum narrowing is observed. 
+        
+    Returns: 
+        np.array: New spectrum, narrower because of the gain. 
+    """
+    return signal * (intensity_yb ** n_passes)
 
 def cutoff_signal(frequency_cutoff:Tuple[float, float], frequency:np.array, signal:np.array) -> Tuple[np.array, np.array]:
     """This function cuts the input signal using input frequency cutoff. It returns the cutted signal. The cut is done so as to discard

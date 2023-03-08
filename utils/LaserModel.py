@@ -74,7 +74,23 @@ class LaserModel:
             gain_df["Frequency (THz)"] = gain_df["Wavelength (nm)"].apply(lambda wl: 1e12 * (c/((wl+1) * 1e-9))) # 1nm shift
 
             gain_df.sort_values(by = "Frequency (THz)", inplace = True)
-            self.yb_frequency, self.yb_field = gain_df["Frequency (THz)"].values, np.sqrt(gain_df["Intensity"].values)
+            yb_frequency, yb_field = gain_df["Frequency (THz)"].values, np.sqrt(gain_df["Intensity"].values)
+
+            # cutting the gain frequency accordingly
+            yb_frequency, yb_field = cutoff_signal(
+                frequency_cutoff=(self.cutoff[0], self.cutoff[-1]), 
+                frequency = yb_frequency * 1e-12, 
+                signal = yb_field)
+            
+            # augmenting the cutted data
+            yb_frequency, yb_field = equidistant_points(
+                frequency = yb_frequency, 
+                signal = yb_field, 
+                num_points = self.num_points
+            )
+            self.yb_frequency = yb_frequency
+            self.yb_intensity = yb_field ** 2
+            self.yb_field = yb_field
         
     def preprocessing(self):
         """This function applies necessary preprocessing steps to the spectrum of the laser.
@@ -101,10 +117,22 @@ class LaserModel:
     def transform_limited(self): 
         """This function returns the transform limited version of the input signal.
         """
-        frequency, field = self.spit_center()
-        phase = np.zeros_like(frequency)
-        time, intensity_TL = temporal_profile(frequency = frequency, field = field, phase = phase, npoints_pad = self.pad_points, return_time=True)
-        return time, intensity_TL
+        step = np.diff(self.frequency)[0]
+        Dt = 1 / step
+        time = np.linspace(start = - Dt/2, stop = Dt/2, num = len(self.frequency) + self.pad_points)
+        # transform limited of amplified spectrum
+        field_padded = np.pad(
+            yb_gain(self.field, self.yb_field),
+            pad_width=(self.pad_points // 2, self.pad_points // 2), 
+            mode = "constant", 
+            constant_values = 0
+        )
+
+        field_time = np.fft.ifftshift(np.fft.ifft(field_padded))
+        intensity_time = np.real(field_time * np.conj(field_time)) # only for casting reasons
+
+        intensity_time =  intensity_time / intensity_time.max() # normalizing
+        return time, intensity_time
 
     def get_field(self): 
         return self.field
@@ -188,19 +216,9 @@ class LaserModel:
         Returns:
             np.array: The field in the laser (\tilde{y}_1), which is the result of the spectrum modification carried out in the non linear cristal.
         """
-        # cutting the gain frequency accordingly
-        yb_frequency, yb_field = cutoff_signal(
-            frequency_cutoff=(self.frequency[0], self.frequency[-1]), 
-            frequency = self.yb_frequency * 1e-12, 
-            signal = self.yb_field)
-        
-        # augmenting the cutted data
-        yb_frequency, yb_field = equidistant_points(
-            frequency = yb_frequency, 
-            signal = yb_field, 
-            num_points = self.num_points
-        )
-        
+        # using yb gain frequency & field
+        yb_frequency, yb_field = self.yb_frequency, self.yb_field
+
         amp_field = yb_field * self.y1
 
         for _ in range(1, n_passes): 
