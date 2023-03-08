@@ -292,6 +292,8 @@ def extract_data()->Tuple[np.array, np.array]:
     field = np.sqrt(intensity)
     
     return frequency, field
+
+
 class PulseEmbedding: 
     def __init__(self, w0:float=12e-3, E:float=220e-3, min_thresh:float=1e-3) -> None: 
         """Init function. 
