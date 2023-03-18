@@ -166,4 +166,5 @@ dependencies:
     - webencodings==0.5.1
     - widgetsnbextension==4.0.2
     - zipp==3.8.0
-prefix: /Users/francescocapuano/opt/anaconda3/envs/elienv
+
+    
