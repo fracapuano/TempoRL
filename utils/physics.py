@@ -2,15 +2,15 @@ import numpy as np
 import torch
 from scipy.constants import c
 
-from utils.torch_utils import iterable_to_cuda
+from .torch_utils import iterable_to_cuda
 from scipy.interpolate import UnivariateSpline
 
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 
 cuda_available = torch.cuda.is_available()
 
 
-def translate_control(central_frequency:float, control:torch.tensor, verse:str = "to_gdd")->torch.tensor: 
+def translate_control(central_frequency:float, control:torch.TensorType, verse:str = "to_gdd")->torch.TensorType: 
         """This function translates the control quantities either from Dispersion coefficients (the di's) to GDD, TOD and FOD using a system of 
         linear equations defined for this very scope or the other way around, according to the "verse" argument.  
 
@@ -57,7 +57,7 @@ def translate_control(central_frequency:float, control:torch.tensor, verse:str =
         else: 
             raise ValueError('Control translation is either "to_gdd" or "to_disp"!')
 
-def phase_equation(frequency:torch.tensor, central_frequency:float, control:torch.tensor) -> torch.tensor: 
+def phase_equation(frequency:torch.TensorType, central_frequency:float, control:torch.TensorType) -> torch.tensor: 
     """This function returns the phase with respect to the frequency and some control parameters.
 
     Args:
@@ -79,7 +79,7 @@ def phase_equation(frequency:torch.tensor, central_frequency:float, control:torc
     
     return phase if cuda_available else phase.cpu()
 
-def yb_gain(signal:torch.tensor, intensity_yb:torch.tensor, n_passes:int=50)->torch.tensor: 
+def yb_gain(signal:torch.TensorType, intensity_yb:torch.TensorType, n_passes:int=50)->torch.TensorType: 
     """This function models the passage of the signal in the cristal in which yb:yab gain is observed.
     
     Args: 
@@ -95,7 +95,7 @@ def yb_gain(signal:torch.tensor, intensity_yb:torch.tensor, n_passes:int=50)->to
     
     return signal * (intensity_yb ** n_passes)
 
-def impose_phase(spectrum:torch.tensor, phase:torch.tensor)->torch.tensor: 
+def impose_phase(spectrum:torch.TensorType, phase:torch.TensorType)->torch.TensorType: 
     """This function imposes a phase on a particular signal.
     
     Args: 
@@ -108,7 +108,7 @@ def impose_phase(spectrum:torch.tensor, phase:torch.tensor)->torch.tensor:
     spectrum, phase = iterable_to_cuda(input = [spectrum, phase])
     return spectrum * torch.exp(1j * phase)
 
-def temporal_profile(frequency:torch.tensor, field:torch.tensor, npoints_pad:int=int(1e4), return_time:bool=True) -> Tuple[np.array, np.array]:
+def temporal_profile(frequency:torch.TensorType, field:torch.TensorType, npoints_pad:int=int(1e4), return_time:bool=True) -> Tuple[torch.tensor, torch.tensor]:
     """This function returns the temporal profile of a given signal represented in the frequency domain. Padding is added so as to have more points and increase FFT algorithm 
     output's quality. 
 
@@ -119,7 +119,7 @@ def temporal_profile(frequency:torch.tensor, field:torch.tensor, npoints_pad:int
         right and half on the left. Defaults to int(1e4).
         return_time (bool, optional): Whether or not to return also the time frame of the signal to be used on the x-axis. Defaults to True. 
     Returns:
-        Tuple[np.array, np.array]: Returns either (time, intensity) (with time measured in in seconds) or intensity only.
+        Tuple[torch.tensor, torch.tensor]: Returns either (time, intensity) (with time measured in in seconds) or intensity only.
     """
     # send iterable to cuda
     frequency, field = iterable_to_cuda(input = [frequency, field])
@@ -142,7 +142,7 @@ def temporal_profile(frequency:torch.tensor, field:torch.tensor, npoints_pad:int
     else: 
         return time, intensity_time if cuda_available else time.cpu(), intensity_time.cpu()
 
-def FWHM(x:torch.tensor, y:torch.tensor, return_roots:bool=False)->Union[float, Tuple[float, float]]: 
+def FWHM(x:torch.TensorType, y:torch.TensorType, return_roots:bool=False)->Union[float, Tuple[float, float]]: 
     """This function computes the FWHM roots of a given signal.
 
     Args:
@@ -166,7 +166,7 @@ def FWHM(x:torch.tensor, y:torch.tensor, return_roots:bool=False)->Union[float, 
     else: 
         return FWHM_value
 
-def FWPercM(x:torch.tensor, y:torch.tensor, perc:float, return_roots:bool=False)->Union[float, Tuple[float, float]]: 
+def FWPercM(x:torch.TensorType, y:torch.TensorType, perc:float, return_roots:bool=False)->Union[float, Tuple[float, float]]: 
     """This function computes the FW Percentual Max roots of a given signal.
 
     Args:
@@ -190,7 +190,7 @@ def FWPercM(x:torch.tensor, y:torch.tensor, perc:float, return_roots:bool=False)
     else: 
         return FWPercM_value
     
-def buildup(time:torch.tensor, intensity:torch.tensor, return_instants=False, min_thresh:float=1e-3) -> Union[float, Tuple[float, float]]: 
+def buildup(time:torch.TensorType, intensity:torch.TensorType, return_instants=False, min_thresh:float=1e-3) -> Union[float, Tuple[float, float]]: 
     """This function computes the buildup instants for the given signal.
 
     Args:
@@ -213,7 +213,7 @@ def buildup(time:torch.tensor, intensity:torch.tensor, return_instants=False, mi
     else: 
         return buildup_duration
 
-def peak_intensity(pulse_intensity:torch.tensor, w0:float=12e-3, E:float=220e-3, dt:float=4.67e-14) -> float: 
+def peak_intensity(pulse_intensity:torch.TensorType, w0:float=12e-3, E:float=220e-3, dt:float=4.67e-14) -> float: 
     """
     This function computes the peak intensity given a pulse shape in the 0-1 range and parameters of the energy.
     
@@ -246,3 +246,34 @@ def central_frequency(frequency:np.array, signal:np.array) -> float:
     left_freq, right_freq = spline.roots().min(), spline.roots().max()
     # returns central frequency (in Hz, not angular)
     return abs(left_freq + right_freq)/2
+
+def peak_on_peak(temporal_profile:List[torch.TensorType], other:List[torch.TensorType])->List[List[torch.TensorType]]: 
+    """This function shifts the two temporal profiles considered to make them centered in the same moment. That is, to have them be peak on peak.
+    Args: 
+        temporal_profile (List[torch.TensorType]): One temporal profile. First element represents time axis while second element represents the actual
+                                                   pulse shape.
+        other (List[torch.TensorType]): Other temporal profile (usually, target one). First element represents time axis while second element represents 
+                                        the actual pulse shape.
+    
+    Returns: 
+        List[List[torch.TensorType], List[torch.TensorType]: List of lists of peak on peak tensors.
+    """
+    # unpacking inputs
+    time, actual_pulse = temporal_profile
+    target_time, target_pulse = other
+    
+    # retrieving index where time is 0 (not exactly 0, dependings on fft Dt value)
+    zero_pos = torch.argwhere(torch.abs(time) == torch.abs(time).min()).item()
+    # retrieving peak of pulse
+    max_pos = torch.argmax(actual_pulse).item()
+    # retrieving peak of target pulse
+    target_max_pos = torch.argmax(target_pulse).item()
+    # rolling the two pulses to make them centered in 0 - target pulse always peaks in 0
+    centering_target = -(max_pos - target_max_pos) if target_max_pos - max_pos >= 0 else max_pos - target_max_pos
+    # always centering the pulse on zero
+    rolled_pulse = torch.roll(
+            actual_pulse, 
+            shifts = centering_target
+            )
+    
+    return [[target_time, rolled_pulse], [target_time, target_pulse]]
