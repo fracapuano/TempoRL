@@ -1,5 +1,8 @@
 """ 
-This script reproduces a semi-physical model for L1 pump-laser. 
+This script reproduces a semi-physical model for L1 pump-laser.
+For a detailed explanation of the model please consider checking out this notebook: 
+https://github.com/fracapuano/ELIopt/blob/main/notebooks/SemiPhysicalModel/SemiPhysicalModel_v2.ipynb
+
 Author: Francesco Capuano, Summer 2022 S17 Intern @ ELI beamlines, Prague.
 """
 import sys
@@ -9,14 +12,14 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
 
-from typing import Tuple
-
 import torch
 import numpy as np
 import pandas as pd
 from scipy.constants import c
+from typing import Tuple
 
 from utils import physics as pt
+from utils import preprocessing as pre
 from utils import *
 
 cuda_available = torch.cuda.is_available()
@@ -24,14 +27,14 @@ cuda_available = torch.cuda.is_available()
 class ComputationalLaser: 
     def __init__(
                 self, 
-                frequency:torch.tensor, 
-                field:torch.tensor, 
+                frequency:torch.TensorType, 
+                field:torch.TensorType, 
                 compressor_params:Tuple[float, float, float],
                 num_points_padding:int=int(3e4), 
                 B:float=2, 
                 central_frequency:float=(c/(1030*1e-9)), 
-                cristal_frequency:torch.tensor=None, 
-                cristal_intensity:torch.tensor=None
+                cristal_frequency:torch.TensorType=None, 
+                cristal_intensity:torch.TensorType=None
                 )->None:
         """Init function. 
         This model is initialized for a considered intensity in the frequency domain signal. The signal is assumed to be already cleaned. 
@@ -47,7 +50,7 @@ class ComputationalLaser:
             cristal_frequency (torch.tensor, optional): Frequency (THz) of the amplification in the non-linear cristal at the beginning of DIRA. Defaults to None.
             cristal_intensity (torch.tensor, optional): Intensity of the amplification in the non-linear cristal at the beginning of DIRA. Defaults to None.
         """
-        self.frequency = frequency * 10 ** 12  # THz to Hz
+        self.frequency = frequency * 1e12  # THz to Hz
         self.field = field  # electric field is the square root of intensity
         self.central_frequency = central_frequency
         # number of points to be used in padding 
@@ -68,20 +71,20 @@ class ComputationalLaser:
 
             gain_df.columns = ["Wavelength (nm)", "Intensity"]
             gain_df["Intensity"] = gain_df["Intensity"] / gain_df["Intensity"].values.max()
-            gain_df["Frequency (THz)"] = gain_df["Wavelength (nm)"].apply(lambda wl: 1e12 * (c/((wl+1) * 1e-9)))  # 1nm rightwards shift
+            gain_df["Frequency (Hz)"] = gain_df["Wavelength (nm)"].apply(lambda wl: (c/((wl+1) * 1e-9)))  # 1nm rightwards shift
 
-            gain_df.sort_values(by = "Frequency (THz)", inplace = True)
-            yb_frequency, yb_field = gain_df["Frequency (THz)"].values, np.sqrt(gain_df["Intensity"].values)
+            gain_df.sort_values(by = "Frequency (Hz)", inplace = True)
+            yb_frequency, yb_field = gain_df["Frequency (Hz)"].values, np.sqrt(gain_df["Intensity"].values)
             
             # cutting the gain frequency accordingly
 
-            yb_frequency, yb_field = pt.cutoff_signal(
+            yb_frequency, yb_field = pre.cutoff_signal(
                 frequency_cutoff=(self.frequency[0].item(), self.frequency[-1].item()), 
                 frequency = yb_frequency, 
                 signal = yb_field)
             
             # augmenting the cutted data
-            yb_frequency, yb_field = pt.equidistant_points(
+            yb_frequency, yb_field = pre.equidistant_points(
                 frequency = yb_frequency, 
                 signal = yb_field, 
                 num_points = len(self.frequency)
@@ -90,7 +93,7 @@ class ComputationalLaser:
             self.yb_intensity = torch.from_numpy(yb_field ** 2)
             self.yb_field = torch.from_numpy(yb_field)
 
-    def translate_control(self, control:torch.tensor, verse:str="to_gdd")->torch.tensor: 
+    def translate_control(self, control:torch.TensorType, verse:str="to_gdd")->torch.TensorType: 
         """This function translates the control quantities either from Dispersion coefficients (the di's) to GDD, TOD and FOD using a system of linear equations 
         defined for this very scope or the other way around, according to the string "verse".  
 
@@ -104,7 +107,7 @@ class ComputationalLaser:
         """
         return pt.translate_control(central_frequency = self.central_frequency, control = control, verse = verse)
     
-    def emit_phase(self, control:torch.tensor)->torch.tensor: 
+    def emit_phase(self, control:torch.TensorType)->torch.TensorType: 
         """This function returns the phase with respect to the frequency and some control parameters.
 
         Args:
@@ -150,7 +153,7 @@ class ComputationalLaser:
         else: 
             return time, intensity_time if cuda_available else intensity_time.cpu()
         
-    def forward_pass(self, control:torch.tensor)->Tuple[torch.tensor, torch.tensor]: 
+    def forward_pass(self, control:torch.TensorType)->Tuple[torch.tensor, torch.tensor]: 
         """This function performs a forward pass in the model using control values stored in control.
 
         Args:
