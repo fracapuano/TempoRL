@@ -65,7 +65,11 @@ class LaserEnv_v1(Abstract_BaseLaser):
         if default_target is True:
             self.target_time, self.target_pulse = self.laser.transform_limited()
         else: 
-            self.target_time, self.target_pulse = self
+            self.target_time, self.target_pulse = default_target
+        
+        # defining maximal number of steps and value for sum(L1) loss 
+        self.MAX_LOSS = 200  # pretty huge number, considering that pulses are in the always in the 0-1 range
+        self.MAX_STEPS = 500
     
     def get_observation_SI(self):
         """
@@ -74,28 +78,31 @@ class LaserEnv_v1(Abstract_BaseLaser):
         """
         return self.control_utils.remagnify_descale(self._observation)
     
-    def _get_info(self): 
-        """Return state-related info."""
-        laser = self.laser
-        _, time, control_shape = laser.forward_pass(self.control_utils.remagnify_descale(self._observation))
-
+    def _get_control_loss(self)->float:
+        """This function returns the value of the L1-Loss for a given set of control parameters."""
+        # obtain the pulse shape corresponding to given set of control params
+        _, time, control_shape = self.laser.forward_pass(self.control_utils.remagnify_descale(self._observation))
+        # move target and controlled pulse peak on peak
         pulse1, pulse2 = physics.peak_on_peak(
              temporal_profile=[time, control_shape], 
              other=[self.target_time, self.target_pulse]
              )
+        # compute sum(L1 loss)
+        return L1Loss(pulse1[1], pulse2[1]).item()
 
+    def _get_info(self): 
+        """Return state-related info."""
         info = {
             "current_control": self._observation,
             "distance_from_lower": torch.norm(self._observation).item(),
             "distance_from_upper": torch.norm(+1 * torch.ones(3) - self._observation).item(),
-            "L1Loss": L1Loss(pulse1[1], pulse2[1]).item()
+            "L1Loss": self._get_control_loss()
         }
-
         return info
 
     def reset(self)->None: 
         """Resets the environment to initial observations"""
-        self._observation = torch.from_numpy(self.observation_space.sample())
+        self._observation = torch.from_numpy(self._observation_space.sample())
         self.n_steps = 0
 
         return self._get_obs() , self._get_info()
@@ -105,8 +112,11 @@ class LaserEnv_v1(Abstract_BaseLaser):
         This function returns a boolean that represents whether or not the optimization process is done
         given the current state.
         """
-        pass
-    
+        if self.n_steps >= self.MAX_STEPS or self._get_control_loss() >= self.MAX_LOSS: 
+            return True  # stop episode, restart
+        else:
+            return False  # continue, episode not done yet
+
     def compute_reward(self, state:torch.TensorType, action:torch.TensorType)->float:
         """
         This function computes the reward associated with the (state, action) pair. 
@@ -121,7 +131,11 @@ class LaserEnv_v1(Abstract_BaseLaser):
             float: Value of reward. Sum of three different components. Namely: Error-Component, Action-Magnitude-Component, Number-of-Steps 
                    Component.
         """
-        pass
+        alive_bonus = self.n_steps / self.MAX_STEPS
+        loss_penalty = -self._get_control_loss()/self.MAX_LOSS  # 0-1 range, in absolute value
+        action_penalty = (-torch.norm(torch.from_numpy(action)))   # 0-1 range as well
+        # this reward is large when loss is small and action performed is minimal
+        return alive_bonus + loss_penalty + action_penalty
 
     def step(self, action:torch.TensorType):
         """
@@ -130,7 +144,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
         # increment number of steps
         self.n_steps += 1
         # applying action, clipping on +1 and -1
-        self._observation = torch.clip(self._observation + action, min=torch.zeros(3), max=torch.ones(3))
+        self._observation = torch.clip(self._observation + torch.from_numpy(action), min=torch.zeros(3), max=torch.ones(3))
         
         reward = self.compute_reward(state=self._observation, action=action)
         done = self.is_done()
