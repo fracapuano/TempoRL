@@ -1,6 +1,7 @@
 import torch
 from typing import Tuple, List
 from gymnasium.spaces import Box
+from torch.distributions.multivariate_normal import MultivariateNormal
 
 from .BaseLaser import Abstract_BaseLaser
 from .env_utils import ControlUtils
@@ -22,7 +23,8 @@ class LaserEnv_v1(Abstract_BaseLaser):
     compressor_params:torch.TensorType,
     B_integral:float,
     render_mode:str=None, 
-    default_target:Tuple[bool, List[torch.TensorType]]=True)->None:
+    default_target:Tuple[bool, List[torch.TensorType]]=True, 
+    init_variance:float=.1)->None:
         """Init function. Here laser-oriented characteristics are defined.
         Args:
             bounds (torch.tensor): GDD, TOD and FOD upper and lower bounds. Shape must be (3x2). Values must be
@@ -37,6 +39,10 @@ class LaserEnv_v1(Abstract_BaseLaser):
                                                                            target).When not True, accepts target time axis and temporal 
                                                                            pulse.
         """
+        # state and action space dimensionality
+        self.StateDim = 3
+        self.ActionDim = 3
+
         # params init
         super().__init__(
              bounds=bounds, 
@@ -50,16 +56,14 @@ class LaserEnv_v1(Abstract_BaseLaser):
         self.render_mode = render_mode
         # specifiying obs space
         self._observation_space = Box(
-             low = torch.zeros(3).numpy(), 
-             high = torch.ones(3).numpy()
+             low = torch.zeros(self.StateDim).numpy(), 
+             high = torch.ones(self.StateDim).numpy()
         )
-        # starting with random parameters
-        self._observation = torch.from_numpy(self._observation_space.sample())
-
+        
         # actions are defined as deltas 
         self.action_space = Box(
-            low = -1 * torch.ones(3).numpy(), 
-            high = +1 * torch.ones(3).numpy()
+            low = -1 * torch.ones(self.ActionDim).numpy(), 
+            high = +1 * torch.ones(self.ActionDim).numpy()
         )
         self.nsteps = 0  # number of steps to converge
         if default_target is True:
@@ -67,10 +71,20 @@ class LaserEnv_v1(Abstract_BaseLaser):
         else: 
             self.target_time, self.target_pulse = default_target
         
-        # defining maximal number of steps and value for sum(L1) loss 
-        self.MAX_LOSS = 200  # pretty huge number, considering that pulses are in the always in the 0-1 range
+        # defining maximal number of steps and value for aligned-sum(L1) loss 
+        self.MAX_LOSS = 500
         self.MAX_STEPS = 500
-    
+
+        self.rho_zero = MultivariateNormal(
+            # loc is compressor params (in the 0-1 range)
+            loc=self.control_utils.demagnify_scale(-1 * self.compressor_params).float(), 
+            # homoscedastic distribution
+            covariance_matrix=torch.diag(init_variance * torch.ones(self.StateDim))
+        )
+
+        # starting with random parameters
+        self._observation = self.rho_zero.sample()
+
     def get_observation_SI(self):
         """
         Returns observation in SI units. SI-units observation are accepted as inputs to
@@ -102,7 +116,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
 
     def reset(self)->None: 
         """Resets the environment to initial observations"""
-        self._observation = torch.from_numpy(self._observation_space.sample())
+        self._observation = self.rho_zero.sample()
         self.n_steps = 0
 
         return self._get_obs() , self._get_info()
@@ -131,11 +145,13 @@ class LaserEnv_v1(Abstract_BaseLaser):
             float: Value of reward. Sum of three different components. Namely: Error-Component, Action-Magnitude-Component, Number-of-Steps 
                    Component.
         """
-        alive_bonus = self.n_steps / self.MAX_STEPS
-        loss_penalty = -self._get_control_loss()/self.MAX_LOSS  # 0-1 range, in absolute value
-        action_penalty = (-torch.norm(torch.from_numpy(action)))   # 0-1 range as well
-        # this reward is large when loss is small and action performed is minimal
-        return alive_bonus + loss_penalty + action_penalty
+        healthy_reward = .02  # small constant, reward for having not failed yet.
+        loss_penalty = self._get_control_loss()/self.MAX_LOSS  # 0-1 range, in absolute value
+        action_penalty = torch.norm(torch.from_numpy(action)) / torch.sqrt(torch.tensor(3))  # 0-1 range as well
+
+        coeff_healthy, coeff_loss, coeff_drastic = 0.1, 0.9, 0.0  # v1 does not take into account actions magnitude
+
+        return coeff_healthy * healthy_reward - coeff_loss * loss_penalty - coeff_drastic * action_penalty
 
     def step(self, action:torch.TensorType):
         """
