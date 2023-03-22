@@ -1,10 +1,12 @@
 import torch
 import matplotlib.pyplot as plt
-from typing import Tuple
+from .physics import peak_on_peak
+from typing import Tuple, List
+from collections import deque
 
 def visualize_pulses(
-    pulse:Tuple[torch.tensor, torch.tensor], 
-    target_pulse:Tuple[torch.tensor, torch.tensor]
+    pulse:List[torch.TensorType], 
+    target_pulse:List[torch.TensorType]
 ):
     """This function visualizes two different pulses rolling up the two to peak-index
     
@@ -16,39 +18,37 @@ def visualize_pulses(
                                                    tensor is temporal profile of a target pulse. This will
                                                    be plotted with a scatter plot.
     """
-    # unpacking inputs
-    time, actual_pulse = pulse
-    target_time, target_pulse = target_pulse
-    
-    # retrieving index where time is 0 (not exactly 0, dependings on fft Dt value)
-    zero_pos = torch.argwhere(torch.abs(time) == torch.abs(time).min()).item()
-    # retrieving peak of pulse
-    max_pos = torch.argmax(actual_pulse).item()
-    # retrieving peak of target pulse
-    target_max_pos = torch.argmax(target_pulse).item()
-    # rolling the two pulses to make them centered in 0
-    centering_target = -(target_max_pos - zero_pos) if target_max_pos - zero_pos >= 0 else zero_pos - target_max_pos
-    # always centering the pulse on zero
-    rolled_pulse = torch.roll(
-            actual_pulse, 
-            shifts = centering_target
-            )
-    
+    # centering and unpacking inputs pulses
+    [time, actual_pulse], [target_time, target_pulse] = peak_on_peak(
+        pulse, 
+        target_pulse
+    )
+        
     fig, ax = plt.subplots()
     # plotting
     ax.plot(
         time.numpy(), 
-        rolled_pulse.numpy(), 
+        actual_pulse.numpy(), 
         lw = 2, 
         label = "Actual Pulse")
 
     ax.scatter(
         time.numpy(), 
-        torch.roll(target_pulse, 
-                shifts = centering_target).numpy(),
+        target_pulse.numpy(),
         label = "Target Pulse", 
         c = "tab:grey",
         marker = "x", 
         s = 50)
     
+    ax.set_xlabel("Time (s)", fontsize=12)
+    ax.set_ylabel("Intensity (a.u.)", fontsize=12)
     ax.set_xlim(-8e-12, 8e-12)
+    ax.legend()
+
+    return fig, ax
+
+def visualize_controls(
+        controls_buffer:deque
+):
+    """Renders a precise control buffer."""
+    pass
