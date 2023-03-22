@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from typing import Tuple, List
 from gymnasium.spaces import Box
 from torch.distributions.multivariate_normal import MultivariateNormal
@@ -6,10 +7,20 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 from .BaseLaser import Abstract_BaseLaser
 from .env_utils import ControlUtils
 from utils import physics
+from utils.render import visualize_pulses, visualize_controls
+
+import matplotlib.pyplot as plt
+from PIL import Image
 
 L1Loss = torch.nn.L1Loss(reduction="sum")
 
+
 class LaserEnv_v1(Abstract_BaseLaser):
+    metadata = {
+        "render_fps":30, 
+        "render_modes": ["rbg_array", "human"]
+        }
+
     """Instances a first version of the L1 Pump laser.
     
     In this version, observations are actual control parameters (that is, \psi). 
@@ -22,7 +33,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
     bounds:torch.TensorType,
     compressor_params:torch.TensorType,
     B_integral:float,
-    render_mode:str=None, 
+    render_mode:str="human", 
     default_target:Tuple[bool, List[torch.TensorType]]=True, 
     init_variance:float=.1)->None:
         """Init function. Here laser-oriented characteristics are defined.
@@ -47,13 +58,12 @@ class LaserEnv_v1(Abstract_BaseLaser):
         super().__init__(
              bounds=bounds, 
              compressor_params=compressor_params, 
-             B_integral=B_integral
+             B_integral=B_integral, 
+             render_mode=render_mode
         )
         # control utils - suite to handle with ease normalization of control params
         self.control_utils = ControlUtils()  # initialized with default parameters 
 
-        # render mode setted
-        self.render_mode = render_mode
         # specifiying obs space
         self._observation_space = Box(
              low = torch.zeros(self.StateDim).numpy(), 
@@ -114,7 +124,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
         }
         return info
 
-    def reset(self)->None: 
+    def reset(self, seed:int=None, options=None)->None: 
         """Resets the environment to initial observations"""
         self._observation = self.rho_zero.sample()
         self.n_steps = 0
@@ -167,3 +177,35 @@ class LaserEnv_v1(Abstract_BaseLaser):
         info = self._get_info()
         
         return self._observation, reward, done, info
+    
+    def _render_pulse(self)->np.array: 
+        """Renders pulse shape against target.
+        
+        Returns:
+            np.array: PIL image as rgb array. 
+        """
+        # retrieving control and target pulse and time axis
+        _, time, control_pulse = self.laser.forward_pass(self.control_utils.\
+                                                         remagnify_descale(self._observation))
+        
+        fig, _ = visualize_pulses([time, control_pulse], [self.target_time, self.target_pulse])
+
+        # creating and coloring the canvas
+        fig.canvas.draw()
+        X = np.array(fig.canvas.renderer.buffer_rgba())
+        pulses_rgb_array = np.array(Image.fromarray(X).convert('RGB'))
+        plt.close(fig)
+
+        return pulses_rgb_array
+
+    def _render_controls(self)->np.array:
+        pass
+
+    def _render_frame(self): 
+        """Renders one frame only using Pillow Image."""
+        # TODO: Combines control (left) and pulse animation (right) in one frame only.
+        pass
+
+    def render(self):
+        """Render method."""
+        return self._render_pulse()
