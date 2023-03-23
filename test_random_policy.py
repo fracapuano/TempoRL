@@ -13,8 +13,9 @@ def main():
     env = LaserEnv_v1(
         bounds = bounds, 
         compressor_params = compressor_params, 
-        B_integral = B_integral)
-
+        B_integral = B_integral, 
+        render_mode="human")
+    
     print('State space:', env._observation_space)
     print('Action space:', env.action_space)
 
@@ -23,7 +24,7 @@ def main():
 
     for episode in range(n_episodes):
         done = False
-        observation = env.reset()	# Reset environment to initial state
+        observation, _ = env.reset()	# Reset environment to initial state
         episode_length = 0
         while not done:  # Until the episode is over
             action = env.action_space.sample()	# Sample random action
