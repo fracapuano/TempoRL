@@ -1,13 +1,13 @@
 import torch
 import numpy as np
 from typing import Tuple, List
-from gymnasium.spaces import Box
+from gym.spaces import Box
 from torch.distributions.multivariate_normal import MultivariateNormal
 
 from .BaseLaser import Abstract_BaseLaser
 from .env_utils import ControlUtils
 from utils import physics
-from utils.render import visualize_pulses, visualize_controls
+from utils.render import visualize_pulses
 import pygame
 
 import matplotlib.pyplot as plt
@@ -66,15 +66,15 @@ class LaserEnv_v1(Abstract_BaseLaser):
         self.control_utils = ControlUtils()  # initialized with default parameters 
 
         # specifiying obs space
-        self._observation_space = Box(
-             low = torch.zeros(self.StateDim).numpy(), 
-             high = torch.ones(self.StateDim).numpy()
+        self.observation_space = Box(
+             low = np.zeros(self.StateDim), 
+             high = np.ones(self.StateDim)
         )
         
         # actions are defined as deltas 
         self.action_space = Box(
-            low = -1 * torch.ones(self.ActionDim).numpy(), 
-            high = +1 * torch.ones(self.ActionDim).numpy()
+            low = -1 * np.ones(self.ActionDim), 
+            high = +1 * np.ones(self.ActionDim)
         )
         self.nsteps = 0  # number of steps to converge
         if default_target is True:
@@ -119,8 +119,8 @@ class LaserEnv_v1(Abstract_BaseLaser):
         """Return state-related info."""
         info = {
             "current_control": self._observation,
-            "distance_from_lower": torch.norm(self._observation).item(),
-            "distance_from_upper": torch.norm(+1 * torch.ones(3) - self._observation).item(),
+            "distance_from_lower": torch.norm(self.tensor_observation).item(),
+            "distance_from_upper": torch.norm(+1 * torch.ones(3) - self.tensor_observation).item(),
             "L1Loss": self._get_control_loss()
         }
         return info
@@ -133,7 +133,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
         if self.render_mode == "human":
             self.render()
 
-        return self._get_obs() , self._get_info()
+        return self._get_obs()
 
     def is_done(self)->bool:
         """
@@ -159,12 +159,11 @@ class LaserEnv_v1(Abstract_BaseLaser):
             float: Value of reward. Sum of three different components. Namely: Error-Component, Action-Magnitude-Component, Number-of-Steps 
                    Component.
         """
-        healthy_reward = .02  # small constant, reward for having not failed yet.
+        healthy_reward = .2  # small constant, reward for having not failed yet.
         loss_penalty = self._get_control_loss()/self.MAX_LOSS  # 0-1 range, in absolute value
-        action_penalty = torch.norm(torch.from_numpy(action)) / torch.sqrt(torch.tensor(3))  # 0-1 range as well
+        action_penalty = (torch.norm(torch.from_numpy(action)) / torch.sqrt(torch.tensor(3))).item()  # 0-1 range as well
 
         coeff_healthy, coeff_loss, coeff_drastic = 0.1, 0.9, 0.0  # v1 does not take into account actions magnitude
-
         return coeff_healthy * healthy_reward - coeff_loss * loss_penalty - coeff_drastic * action_penalty
 
     def step(self, action:torch.TensorType):
