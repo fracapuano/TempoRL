@@ -8,6 +8,7 @@ from .BaseLaser import Abstract_BaseLaser
 from .env_utils import ControlUtils
 from utils import physics
 from utils.render import visualize_pulses, visualize_controls
+import pygame
 
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -20,7 +21,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
         "render_fps":30, 
         "render_modes": ["rbg_array", "human"]
         }
-
+    
     """Instances a first version of the L1 Pump laser.
     
     In this version, observations are actual control parameters (that is, \psi). 
@@ -33,7 +34,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
     bounds:torch.TensorType,
     compressor_params:torch.TensorType,
     B_integral:float,
-    render_mode:str="human", 
+    render_mode:str="rgb_array", 
     default_target:Tuple[bool, List[torch.TensorType]]=True, 
     init_variance:float=.1)->None:
         """Init function. Here laser-oriented characteristics are defined.
@@ -129,6 +130,9 @@ class LaserEnv_v1(Abstract_BaseLaser):
         self._observation = self.rho_zero.sample()
         self.n_steps = 0
 
+        if self.render_mode == "human":
+            self.render()
+
         return self._get_obs() , self._get_info()
 
     def is_done(self)->bool:
@@ -188,7 +192,13 @@ class LaserEnv_v1(Abstract_BaseLaser):
         _, time, control_pulse = self.laser.forward_pass(self.control_utils.\
                                                          remagnify_descale(self._observation))
         
-        fig, _ = visualize_pulses([time, control_pulse], [self.target_time, self.target_pulse])
+        # using rendering functions to show off pulses
+        fig, ax = visualize_pulses([time, control_pulse], [self.target_time, self.target_pulse])
+        # specializing the plots for showcasing trajectories
+        ax.legend(loc="upper left", fontsize=12)
+        title_string = f"Timestep {self.n_steps}/{self.MAX_STEPS}"
+        title_string = title_string if self.n_steps != 0 else "START" + title_string
+        ax.set_title(title_string, fontsize=12)
 
         # creating and coloring the canvas
         fig.canvas.draw()
@@ -199,13 +209,45 @@ class LaserEnv_v1(Abstract_BaseLaser):
         return pulses_rgb_array
 
     def _render_controls(self)->np.array:
-        pass
+        """
+        Renders the evolution of control parameters in feasible space with respect to a size `n` deque.
+        """
+        raise NotImplementedError("This method has not been implemented yet (be patient!).")
 
     def _render_frame(self): 
-        """Renders one frame only using Pillow Image."""
-        # TODO: Combines control (left) and pulse animation (right) in one frame only.
-        pass
+        """
+        Renders one frame only using Pygame.
+        """
+        if self.render_mode == "rgb_array":  # returns the transposed rgb array
+            return np.transpose(self._render_pulse(), axes=(1, 0, 2))
+        
+        elif self.render_mode == "human":  # renders using pygame
+            screen_size = (640, 480)
+
+            if getattr(self, "window", None) is None:
+                pygame.init()
+                pygame.display.init()
+                self.window = pygame.display.set_mode(screen_size)  # usual screen size
+
+            if getattr(self, "clock", None) is None:
+                self.clock = pygame.time.Clock()
+            
+            # converting RGB array to something meaningful
+            visual_rgb_array = np.transpose(self._render_pulse(), axes=(1, 0, 2))
+            # creating the surface from the pulse surface
+            pulses_surf = pygame.surfarray.make_surface(visual_rgb_array) 
+            # rescaling the surface to fit screen size
+            pulses_surf = pygame.transform.scale(pulses_surf, screen_size)
+            self.window.blit(pulses_surf, (0, 0))
+            pygame.event.pump()
+            self.clock.tick(self.metadata["render_fps"])
+            pygame.display.flip()
+
+    def close(self):
+        if getattr(self, "window", None) is not None:
+            pygame.display.quit()
+            pygame.quit()
 
     def render(self):
-        """Render method."""
-        return self._render_pulse()
+        """Calls the render frame method."""
+        return self._render_frame()
