@@ -128,3 +128,6 @@ dmypy.json
 
 # wandb folder
 wandb
+
+# runs folder
+runs
