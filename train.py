@@ -6,14 +6,16 @@ from env.env_utils import EnvParametrization
 from utils import reverseAlgoDict
 
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
+from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.callbacks import CheckpointCallback
 import wandb
 from wandb.integration.sb3 import WandbCallback
 import argparse
 
 trainsteps_dict = {
     1e4: "1e4", 
-    2e5: "2e5"
+    2e5: "2e5", 
+    5e5: "5e5"
 }
  
 def boolean_string(s):
@@ -57,7 +59,7 @@ model_path=args.model_path
 if args.default: 
     algorithm="PPO"
     verbose=0
-    train_timesteps=5e5
+    train_timesteps=1e4
     evaluate_while_training=True
     store_checkpoints=True
     evaluation_frequency=1000
@@ -103,13 +105,17 @@ def main():
     params = EnvParametrization()
     compressor_params, bounds, B_integral = params.get_parametrization()
     # define the environment (on top of xi)
-    env = LaserEnv_v1(
-        bounds = bounds, 
-        compressor_params = compressor_params, 
-        B_integral = B_integral)
-    # vectorized environment, wrapped with video recorder
-    env = DummyVecEnv([lambda: Monitor(env=env)])
+    def make_env():
+        env = LaserEnv_v1(
+            bounds = bounds, 
+            compressor_params = compressor_params, 
+            B_integral = B_integral)
+        env = Monitor(env)
+        return env
     
+    # vectorized environment, wrapped with video recorder
+    env = DummyVecEnv([make_env])
+
     # retrieve the algorithm used
     model_function = reverseAlgoDict[algorithm.upper()]
     model = model_function(
@@ -118,11 +124,15 @@ def main():
         verbose=verbose, 
         seed=seed,
         tensorboard_log=f"runs/{run.id}"
-        )
+    )
     # setting the name for filenames
     model_name = algorithm.upper() + version + "_" + trainsteps_dict[train_timesteps]
+    # saving a model every tot timesteps
+    checkpoint_save = CheckpointCallback(
+        save_freq=evaluation_frequency, save_path="checkpoints/", name_prefix=f"{algorithm}"
+    )
     # list of callbacks (then, DR should be implemented in here)
-    callback_list = []
+    callback_list = [checkpoint_save]
     # adding wandb callback to other callbacks
     if True:
         callback_list.append(wand_callback)
@@ -136,7 +146,7 @@ def main():
         raise NotImplementedError("Incremental learning has not been implemented yet!")
         # only resuming training of partially-trained model
         # remaining_training_steps = int(float(input("Please enter new number of training steps: ")))
-            
+
     if save_model: 
         model.save(f"trainedmodels/{model_name}.zip")
 

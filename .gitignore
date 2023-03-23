@@ -131,3 +131,6 @@ wandb
 
 # runs folder
 runs
+
+# videos folder
+videos
