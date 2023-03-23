@@ -41,6 +41,11 @@ class Abstract_BaseLaser(gym.Env):
         self.action_space = None
     
     @property
+    def tensor_observation(self): 
+        return self._observation
+        # return torch.from_numpy(self._observation)
+
+    @property
     def laser(self)->object:
         """Returns Laser object"""
         return self._laser
