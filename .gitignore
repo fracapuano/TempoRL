@@ -134,3 +134,6 @@ runs
 
 # videos folder
 videos
+
+# vscode folder
+.vscode

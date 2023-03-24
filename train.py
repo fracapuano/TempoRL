@@ -3,16 +3,18 @@ Trains a given policy on the laser environment.
 """
 from env.LaserEnv_v1 import LaserEnv_v1
 from env.env_utils import EnvParametrization
+# from env.custom_callbacks import TestPolicyCallback
 from utils import reverseAlgoDict
 
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
-from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.callbacks import CheckpointCallback, EveryNTimesteps
 import wandb
 from wandb.integration.sb3 import WandbCallback
 import argparse
 
 trainsteps_dict = {
+    100: "1e2",
     1e4: "1e4", 
     2e5: "2e5", 
     5e5: "5e5"
@@ -51,7 +53,7 @@ train_timesteps=args.train_timesteps
 evaluate_while_training=args.evaluate_while_training
 store_checkpoints=args.store_checkpoints
 evaluation_frequency=args.evaluation_frequency
-test_episodes=args.test_episodes
+test_episodes=args.test_episodes  # currently testing one episode only, consider removing
 save_model=args.save_model
 resume_training=args.resume_training
 model_path=args.model_path
@@ -59,12 +61,12 @@ model_path=args.model_path
 if args.default: 
     algorithm="PPO"
     verbose=0
-    train_timesteps=1e4
+    train_timesteps=15
     evaluate_while_training=True
     store_checkpoints=True
-    evaluation_frequency=1000
+    evaluation_frequency=10
     test_episodes=50
-    save_model=True
+    save_model=False
     resume_training=False
     model_path=None
 
@@ -74,7 +76,7 @@ def main():
     # np.random.seed(seed)
     # random.seed(seed)
 
-    checkpoint_frequency = 25_000
+    checkpoint_frequency = 250_000
 
     if algorithm.upper() not in ["TRPO", "PPO", "A2C", "SAC"]:
         print(f"Prompted algorithm (upper): {algorithm.upper()}")
@@ -87,12 +89,14 @@ def main():
     "version": version,
     "model": algorithm.upper(),
     "total_timesteps": train_timesteps,
+    "policy": "MlpPolicy", 
+    "note": "0.01-0.99 weights with action space reduced to +-0.2"
     }
     
     # using wandb to log the training process
     if True:
         run = wandb.init(
-        project="DeepPulse-SPIE",
+        project="DeepPulse-SPIE-Debug",
         config=training_config,
         sync_tensorboard=True,
         monitor_gym=True,
@@ -104,7 +108,7 @@ def main():
     # define xi
     params = EnvParametrization()
     compressor_params, bounds, B_integral = params.get_parametrization()
-    # define the environment (on top of xi)
+    # define environment (on top of xi)
     def make_env():
         env = LaserEnv_v1(
             bounds = bounds, 
@@ -116,31 +120,39 @@ def main():
     # vectorized environment, wrapped with video recorder
     env = DummyVecEnv([make_env])
 
-    # retrieve the algorithm used
+    # retrieve the algorithm to use
     model_function = reverseAlgoDict[algorithm.upper()]
+    
     model = model_function(
-        "MlpPolicy",
+        training_config["policy"],
         env=env, 
         verbose=verbose, 
         seed=seed,
         tensorboard_log=f"runs/{run.id}"
     )
     # setting the name for filenames
-    model_name = algorithm.upper() + version + "_" + trainsteps_dict[train_timesteps]
+    model_name = algorithm.upper() + version + "_" + trainsteps_dict.get(train_timesteps, str(train_timesteps))
     # saving a model every tot timesteps
     checkpoint_save = CheckpointCallback(
         save_freq=evaluation_frequency, save_path="checkpoints/", name_prefix=f"{algorithm}"
     )
+    # saving the actions performed during one test episode every `evaluation_frequency` training ones.
+    # test_pulses = TestPolicyCallback(env=env, render=True)
+    # evaluation_callback = EveryNTimesteps(n_steps=evaluation_frequency, callback=test_pulses)
     # list of callbacks (then, DR should be implemented in here)
-    callback_list = [checkpoint_save]
+    # callback_list = [checkpoint_save, evaluation_callback]
+    callback_list = []
     # adding wandb callback to other callbacks
-    if True:
+    if False:
         callback_list.append(wand_callback)
 
     # training the model with train_timesteps
     if not resume_training:
-        print(f"Training: {model_name}")
-        model.learn(total_timesteps=train_timesteps, callback=callback_list, progress_bar=True)
+        print(f"Training: {model_name} for {train_timesteps} timesteps.")
+        model.learn(
+            total_timesteps=train_timesteps, 
+            callback=callback_list, 
+            progress_bar=True)
     
     else:
         raise NotImplementedError("Incremental learning has not been implemented yet!")

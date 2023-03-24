@@ -18,7 +18,7 @@ L1Loss = torch.nn.L1Loss(reduction="sum")
 
 class LaserEnv_v1(Abstract_BaseLaser):
     metadata = {
-        "render_fps":30, 
+        "render_fps":15, 
         "render_modes": ["rbg_array", "human"]
         }
     
@@ -71,11 +71,12 @@ class LaserEnv_v1(Abstract_BaseLaser):
              high = np.ones(self.StateDim)
         )
         
-        # actions are defined as deltas 
+        # actions are defined as deltas - updates are bounded
         self.action_space = Box(
-            low = -1 * np.ones(self.ActionDim), 
-            high = +1 * np.ones(self.ActionDim)
+            low = -0.2 * np.ones(self.ActionDim), 
+            high = 0.2 * np.ones(self.ActionDim)
         )
+
         self.nsteps = 0  # number of steps to converge
         if default_target is True:
             self.target_time, self.target_pulse = self.laser.transform_limited()
@@ -94,19 +95,21 @@ class LaserEnv_v1(Abstract_BaseLaser):
         )
 
         # starting with random parameters
-        self._observation = self.rho_zero.sample()
+        self._observation = torch.clip(self.rho_zero.sample(), torch.zeros(self.StateDim), torch.ones(self.StateDim))
 
     def get_observation_SI(self):
         """
-        Returns observation in SI units. SI-units observation are accepted as inputs to
-        the Computational Laser considered.
+        Returns observation in SI units. 
+        SI-units observations only are accepted as inputs to the ComputationalLaser considered.
         """
         return self.control_utils.remagnify_descale(self._observation)
     
     def _get_control_loss(self)->float:
         """This function returns the value of the L1-Loss for a given set of control parameters."""
+        
         # obtain the pulse shape corresponding to given set of control params
         _, time, control_shape = self.laser.forward_pass(self.control_utils.remagnify_descale(self._observation))
+        
         # move target and controlled pulse peak on peak
         pulse1, pulse2 = physics.peak_on_peak(
              temporal_profile=[time, control_shape], 
@@ -127,7 +130,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
 
     def reset(self, seed:int=None, options=None)->None: 
         """Resets the environment to initial observations"""
-        self._observation = self.rho_zero.sample()
+        self._observation = torch.clip(self.rho_zero.sample(), torch.zeros(self.StateDim), torch.ones(self.StateDim))
         self.n_steps = 0
 
         if self.render_mode == "human":
@@ -163,7 +166,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
         loss_penalty = self._get_control_loss()/self.MAX_LOSS  # 0-1 range, in absolute value
         action_penalty = (torch.norm(torch.from_numpy(action)) / torch.sqrt(torch.tensor(3))).item()  # 0-1 range as well
 
-        coeff_healthy, coeff_loss, coeff_drastic = 0.1, 0.9, 0.0  # v1 does not take into account actions magnitude
+        coeff_healthy, coeff_loss, coeff_drastic = 0.01, 0.99, 0.0  # v1 does not take into account actions magnitude
         return coeff_healthy * healthy_reward - coeff_loss * loss_penalty - coeff_drastic * action_penalty
 
     def step(self, action:torch.TensorType):
@@ -247,6 +250,6 @@ class LaserEnv_v1(Abstract_BaseLaser):
             pygame.display.quit()
             pygame.quit()
 
-    def render(self):
+    def render(self, mode="human"):
         """Calls the render frame method."""
         return self._render_frame()
