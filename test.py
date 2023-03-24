@@ -24,7 +24,6 @@ def parse_args()->object:
     parser = argparse.ArgumentParser()
     parser.add_argument("--algorithm", default="PPO", type=str, help="RL Algorithm. One in ['TRPO', 'PPO', 'A2C', 'SAC']")
     parser.add_argument("--verbose", default=0, type=int, help="Verbosity value")
-    parser.add_argument("--train-timesteps", default=1e5, type=float, help="Number of timesteps to train the RL algorithm with")
     parser.add_argument("--test-episodes", default=50, type=int, help="Number of test matches the agent plays during periodic evaluation")
     parser.add_argument("--model-path", default=None, type=str, help="Model path")
     parser.add_argument("--render", default=False, type=boolean_string, help="Whether or not to render the environment")
@@ -36,7 +35,6 @@ args = parse_args()
 
 algorithm=args.algorithm
 verbose=args.verbose
-train_timesteps=args.train_timesteps
 render=args.render
 test_episodes=args.test_episodes
 model_path=args.model_path
@@ -44,7 +42,6 @@ model_path=args.model_path
 if args.default: 
     algorithm="PPO"
     verbose=2
-    train_timesteps=1e4
     test_episodes=50
     render=True
     model_path="trainedmodels"
@@ -72,12 +69,9 @@ def main():
         compressor_params = compressor_params, 
         B_integral = B_integral, 
         render_mode="human")
-    
-    # retrieve the name of the model trained
-    model_name = algorithm.upper() + version + "_" + trainsteps_dict[train_timesteps]
-    
+            
     model_function = reverseAlgoDict[algorithm.upper()]
-    model = model_function.load(model_path + "/" + model_name + ".zip")
+    model = model_function.load(model_path)
     # setting the name for filenames
     
     for _ in range(test_episodes): 
