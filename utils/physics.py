@@ -263,7 +263,7 @@ def peak_on_peak(temporal_profile:List[torch.TensorType], other:List[torch.Tenso
     target_time, target_pulse = other
     
     # retrieving index where time is 0 (not exactly 0, dependings on fft Dt value)
-    zero_pos = torch.argwhere(torch.abs(time) == torch.abs(time).min()).item()
+    zero_pos = torch.argwhere(torch.abs(time) == torch.abs(time).min())[0].item()
     # retrieving peak of pulse
     max_pos = torch.argmax(actual_pulse).item()
     # retrieving peak of target pulse
