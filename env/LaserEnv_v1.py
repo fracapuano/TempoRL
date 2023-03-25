@@ -52,6 +52,9 @@ class LaserEnv_v1(Abstract_BaseLaser):
                                                                            target).When not True, accepts target time axis and temporal 
                                                                            pulse.
         """
+        # device on which to run computation
+        self.device = device
+        
         # state and action space dimensionality
         self.StateDim = 3
         self.ActionDim = 3
