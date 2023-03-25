@@ -12,7 +12,8 @@ class Abstract_BaseLaser(gym.Env):
                  bounds:torch.TensorType, 
                  compressor_params:torch.TensorType,
                  B_integral:float, 
-                 render_mode:str=None):
+                 render_mode:str=None, 
+                 seed:int=None):
         """Init function. Here laser-oriented characteristics are defined.
         Args: 
             bounds (torch.tensor): GDD, TOD and FOD upper and lower bounds. Shape must be (3x2). Values must be
@@ -39,6 +40,7 @@ class Abstract_BaseLaser(gym.Env):
         self._observation = None
         self._observation_space = None
         self.action_space = None
+        self._seed = seed
     
     @property
     def tensor_observation(self): 
@@ -99,3 +101,6 @@ class Abstract_BaseLaser(gym.Env):
     def render(self):
         """Renders current state."""
         pass
+
+    def seed(self, seed:int):
+        self._seed = seed
