@@ -269,7 +269,7 @@ def peak_on_peak(temporal_profile:List[torch.TensorType], other:List[torch.Tenso
     # retrieving peak of target pulse
     target_max_pos = torch.argmax(target_pulse).item()
     # rolling the two pulses to make them centered in 0 - target pulse always peaks in 0
-    centering_target = -(max_pos - target_max_pos) if target_max_pos - max_pos >= 0 else max_pos - target_max_pos
+    centering_target = -(max_pos - target_max_pos) if max_pos - target_max_pos >= 0 else target_max_pos - max_pos
     # always centering the pulse on zero
     rolled_pulse = torch.roll(
             actual_pulse, 
