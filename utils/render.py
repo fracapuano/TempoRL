@@ -42,7 +42,7 @@ def visualize_pulses(
     
     ax.set_xlabel("Time (s)", fontsize=12)
     ax.set_ylabel("Intensity (a.u.)", fontsize=12)
-    # ax.set_xlim(-8e-11, 8e-11)
+    ax.set_xlim(-8e-11, 8e-11)
     ax.legend()
 
     return fig, ax
