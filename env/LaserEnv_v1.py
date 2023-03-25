@@ -184,9 +184,9 @@ class LaserEnv_v1(Abstract_BaseLaser):
         """
         healthy_reward = 2  # small constant, reward for having not failed yet.
         loss_penalty = self._get_control_loss()
-        action_penalty = (torch.norm(torch.from_numpy(action)) / torch.sqrt(torch.tensor(3))).item()  # 0-1 range as well
-
-        coeff_healthy, coeff_loss, coeff_drastic = 1, 0.01, 0.0  # v1 does not take into account actions magnitude
+        action_penalty = (torch.norm(torch.from_numpy(action)) / torch.sqrt(torch.tensor(3))).item()  # 0-1 range
+        # v1 does not take into account actions magnitude nor healthy reward
+        coeff_healthy, coeff_loss, coeff_drastic = 0.0, 1, 0.0 
         return coeff_healthy * healthy_reward - coeff_loss * loss_penalty - coeff_drastic * action_penalty
 
     def step(self, action:torch.TensorType):
