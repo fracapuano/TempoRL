@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 L1Loss = torch.nn.L1Loss(reduction="sum")
-
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class LaserEnv_v1(Abstract_BaseLaser):
     metadata = {
@@ -36,7 +36,8 @@ class LaserEnv_v1(Abstract_BaseLaser):
     B_integral:float,
     render_mode:str="rgb_array", 
     default_target:Tuple[bool, List[torch.TensorType]]=True, 
-    init_variance:float=.1)->None:
+    init_variance:float=.1,
+    device:str=device)->None:
         """Init function. Here laser-oriented characteristics are defined.
         Args:
             bounds (torch.tensor): GDD, TOD and FOD upper and lower bounds. Shape must be (3x2). Values must be
@@ -116,7 +117,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
              other=[self.target_time, self.target_pulse]
              )
         # compute sum(L1 loss)
-        return L1Loss(pulse1[1], pulse2[1]).item()
+        return L1Loss(pulse1[1].to(self.device), pulse2[1].to(self.device)).item()
 
     def _get_info(self): 
         """Return state-related info."""
