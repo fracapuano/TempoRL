@@ -37,6 +37,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
     render_mode:str="rgb_array", 
     default_target:Tuple[bool, List[torch.TensorType]]=True, 
     init_variance:float=.1,
+    action_bounds:Tuple[float, List[float]]=0.2,
     device:str=device)->None:
         """Init function. Here laser-oriented characteristics are defined.
         Args:
@@ -59,6 +60,12 @@ class LaserEnv_v1(Abstract_BaseLaser):
         self.StateDim = 3
         self.ActionDim = 3
 
+        # custom bounds for env
+        if not isinstance(action_bounds, list): 
+            self.action_lower_bound, self.action_upper_bound = -action_bounds, +action_bounds
+        else:
+            self.action_lower_bound, self.action_upper_bound = action_bounds
+
         # params init
         super().__init__(
              bounds=bounds, 
@@ -77,8 +84,8 @@ class LaserEnv_v1(Abstract_BaseLaser):
         
         # actions are defined as deltas - updates are bounded
         self.action_space = Box(
-            low = -0.2 * np.ones(self.ActionDim), 
-            high = 0.2 * np.ones(self.ActionDim)
+            low = -self.action_lower_bound * np.ones(self.ActionDim), 
+            high= +self.action_upper_bound * np.ones(self.ActionDim)
         )
 
         self.nsteps = 0  # number of steps to converge
@@ -100,6 +107,9 @@ class LaserEnv_v1(Abstract_BaseLaser):
 
         # starting with random parameters
         self._observation = torch.clip(self.rho_zero.sample(), torch.zeros(self.StateDim), torch.ones(self.StateDim))
+        # storing info related to why has the episode stopped
+        self.LossStoppage = False
+        self.TimeStepsStoppage = False
 
     def get_observation_SI(self):
         """
@@ -126,9 +136,9 @@ class LaserEnv_v1(Abstract_BaseLaser):
         """Return state-related info."""
         info = {
             "current_control": self._observation,
-            "distance_from_lower": torch.norm(self.tensor_observation).item(),
-            "distance_from_upper": torch.norm(+1 * torch.ones(3) - self.tensor_observation).item(),
-            "L1Loss": self._get_control_loss()
+            "L1Loss": self._get_control_loss(),
+            "LossStoppage": self.LossStoppage,
+            "TimeStepsStoppage": self.TimeStepsStoppage,
         }
         return info
 
@@ -147,7 +157,13 @@ class LaserEnv_v1(Abstract_BaseLaser):
         This function returns a boolean that represents whether or not the optimization process is done
         given the current state.
         """
-        if self.n_steps >= self.MAX_STEPS or self._get_control_loss() >= self.MAX_LOSS: 
+        reached_maximal_timesteps = self.n_steps >= self.MAX_STEPS
+        reached_loss_threshold = self._get_control_loss() >= self.MAX_LOSS
+        
+        self.TimeStepsStoppage = reached_maximal_timesteps
+        self.LossStoppage = reached_loss_threshold
+
+        if reached_maximal_timesteps or reached_loss_threshold: 
             return True  # stop episode, restart
         else:
             return False  # continue, episode not done yet
