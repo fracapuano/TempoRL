@@ -18,7 +18,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class LaserEnv_v1(Abstract_BaseLaser):
     metadata = {
-        "render_fps":15, 
+        "render_fps":5, 
         "render_modes": ["rbg_array", "human"]
         }
     
@@ -216,10 +216,14 @@ class LaserEnv_v1(Abstract_BaseLaser):
         
         # using rendering functions to show off pulses
         fig, ax = visualize_pulses([time, control_pulse], [self.target_time, self.target_pulse])
+        
         # specializing the plots for showcasing trajectories
-        ax.legend(loc="upper left", fontsize=12)
         title_string = f"Timestep {self.n_steps}/{self.MAX_STEPS}"
-        title_string = title_string if self.n_steps != 0 else "START" + title_string
+        if self.n_steps == 0:  # episode start
+            title_string = title_string if self.n_steps != 0 else "*** START *** " + title_string
+            ax.get_lines()[0].set_color("red")
+        
+        ax.legend(loc="upper left", fontsize=12)
         ax.set_title(title_string, fontsize=12)
 
         # creating and coloring the canvas
