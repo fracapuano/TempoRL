@@ -54,6 +54,8 @@ if args.default:
 GAMMA = 0.9
 
 def main():
+    run_custom_name = False
+    
     """Performs training and logs training info to wandb."""
     # training config dictionary
     training_config = dict(
@@ -69,7 +71,7 @@ def main():
         config=training_config,
         monitor_gym=True,
         save_code=True,
-        name=f"{algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}"
+        name=f"{algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}" if run_custom_name else None
         )
 
     # build the envs according to spec
