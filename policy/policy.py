@@ -30,15 +30,15 @@ class Policy:
         self.seed = seed
         self.device = device
         self.env = env
-        self.algo = algo
+        self.algo = algo.lower()
         self.gamma = gamma
 
         # either train from scratch (create_model) or from partially trained agent (load_model)
         if load_from_pathname is None:
-            self.model = self.create_model(algo, lr=lr)
+            self.model = self.create_model(self.algo, lr=lr)
             self.model_loaded = False
         else:
-            self.model = self.load_model(algo, load_from_pathname)
+            self.model = self.load_model(self.algo, load_from_pathname)
             self.model_loaded = True
 
     def create_model(self, algo, lr):
