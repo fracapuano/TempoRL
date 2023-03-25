@@ -77,8 +77,7 @@ class PulseTrainingCallback(BaseCallback):
             render=self.render)
         std_cum_reward = std_cum_reward if std_cum_reward > 0 else 1e-6
         
-        #wandb.log
-        print({
+        wandb.log({
             "(%) LossStoppage": round(self.EvaluationStats.loss_stoppages / self.n_eval_episodes, 2),
             "(%) TimeStepsStoppage": round(self.EvaluationStats.timesteps_stoppages / self.n_eval_episodes, 2),
             "Avg(EpisodeLen)": np.mean(self.EvaluationStats.episode_lens)
@@ -92,8 +91,7 @@ class PulseTrainingCallback(BaseCallback):
             self.best_model.save(path=f"{self.best_model_path}/best_model.zip")
             self.bests_found += 1
 
-        #wandb.log
-        print({
+        wandb.log({
             "Mean Cumulative Reward": mean_cum_reward, 
             "Std of Cumulative Reward": std_cum_reward,
             "Std-Scaled Mean Cumulative Reward": mean_cum_reward / std_cum_reward
