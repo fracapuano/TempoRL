@@ -98,5 +98,4 @@ class Abstract_BaseLaser(gym.Env):
     
     def render(self):
         """Renders current state."""
-        # how to render?? Rendering is going to be super useful :))
         pass
