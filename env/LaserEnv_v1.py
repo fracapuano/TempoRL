@@ -37,7 +37,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
     render_mode:str="rgb_array", 
     default_target:Tuple[bool, List[torch.TensorType]]=True, 
     init_variance:float=.1,
-    action_bounds:Tuple[float, List[float]]=0.2,
+    action_bounds:Tuple[float, List[float]]=0.1,
     device:str=device)->None:
         """Init function. Here laser-oriented characteristics are defined.
         Args:
@@ -96,7 +96,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
         
         # defining maximal number of steps and value for aligned-sum(L1) loss 
         self.MAX_LOSS = 500
-        self.MAX_STEPS = 500
+        self.MAX_STEPS = 50
 
         self.rho_zero = MultivariateNormal(
             # loc is compressor params (in the 0-1 range)
@@ -182,11 +182,11 @@ class LaserEnv_v1(Abstract_BaseLaser):
             float: Value of reward. Sum of three different components. Namely: Error-Component, Action-Magnitude-Component, Number-of-Steps 
                    Component.
         """
-        healthy_reward = .2  # small constant, reward for having not failed yet.
-        loss_penalty = self._get_control_loss()/self.MAX_LOSS  # 0-1 range, in absolute value
+        healthy_reward = 2  # small constant, reward for having not failed yet.
+        loss_penalty = self._get_control_loss()
         action_penalty = (torch.norm(torch.from_numpy(action)) / torch.sqrt(torch.tensor(3))).item()  # 0-1 range as well
 
-        coeff_healthy, coeff_loss, coeff_drastic = 0.01, 0.99, 0.0  # v1 does not take into account actions magnitude
+        coeff_healthy, coeff_loss, coeff_drastic = 1, 0.01, 0.0  # v1 does not take into account actions magnitude
         return coeff_healthy * healthy_reward - coeff_loss * loss_penalty - coeff_drastic * action_penalty
 
     def step(self, action:torch.TensorType):
