@@ -21,10 +21,9 @@ def parse_args()->object:
     parser.add_argument("--env-version", default="v1", type=str, help="Version of custom env to use. One in [...]")
     parser.add_argument("--verbose", default=0, type=int, help="Verbosity value")
     parser.add_argument("--train-timesteps", default=1e5, type=float, help="Number of timesteps to train the RL algorithm with")
-    parser.add_argument("--evaluate_while_training", default=True, type=boolean_string, help="Whether or not to evaluate the RL algorithm while training")
     parser.add_argument("--evaluation-frequency", default=1e4, type = float, help="Frequency with which to evaluate policy against random fair opponent")
     parser.add_argument("--test-episodes", default=25, type=int, help="Number of test matches the agent plays during periodic evaluation")
-    parser.add_argument("--resume-training", default=False, type=boolean_string, help="Whether or not load and keep train an already trained model")
+    parser.add_argument("--resume-training", action="store_true", help="Whether or not load and keep train an already trained model")
     parser.add_argument("--model-path", default="models/", type=str, help="Path to which the model to incrementally train is stored")
     parser.add_argument("--render", action="store_true", help="Boolean flag related to whether or not to render the env")
     parser.add_argument("--seed", default=777, type=int, help="Random seed setted")
@@ -38,7 +37,6 @@ algorithm=args.algorithm
 env_version=args.env_version
 verbose=args.verbose
 train_timesteps=args.train_timesteps
-evaluate_while_training=args.evaluate_while_training
 evaluate_every=args.evaluation_frequency
 test_episodes=args.test_episodes
 resume_training=args.resume_training
@@ -61,6 +59,7 @@ def main():
     training_config = dict(
         algorithm=algorithm,
         env_version=env_version,
+        discount_factor=GAMMA,
         train_timesteps=train_timesteps,
         random_seed=seed,
     )
@@ -84,7 +83,8 @@ def main():
         algo=algorithm,
         env=envs,
         gamma=GAMMA,
-        seed=seed)
+        seed=seed, 
+        load_from_pathname=model_path if resume_training else None)
     
     if verbose > 0: 
         print(f"Starting to train: {algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}")
