@@ -8,7 +8,11 @@ from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 from .LaserEnv_v1 import LaserEnv_v1
 from stable_baselines3.common.monitor import Monitor
 
-def build_default_env(n_envs:int=1, subprocess:bool=True)->VecEnv:
+VersionDict = dict(
+    v1=LaserEnv_v1,
+)
+
+def build_default_env(version:str="v1", n_envs:int=1, subprocess:bool=True)->VecEnv:
     """Simply builds an env using default configuration for the environment.
 
     Args: 
@@ -24,18 +28,16 @@ def build_default_env(n_envs:int=1, subprocess:bool=True)->VecEnv:
     compressor_params, bounds, B_integral = params.get_parametrization()
     # define environment (on top of xi)
     def make_env():
-        env = LaserEnv_v1(
-            bounds = bounds, 
+        env = VersionDict[version](
+            bounds = bounds,
             compressor_params = compressor_params, 
             B_integral = B_integral)
-        # remove!
-        env.MAX_STEPS = 2
         env = Monitor(env)
         return env
 
     # vectorized environment, wrapped with Monitor
     if subprocess:
-        env = SubprocVecEnv([make_env for _ in range(n_envs)], start_method="fork")
+        env = SubprocVecEnv([make_env for _ in range(n_envs)], start_method="fork")  # maybe change, test on heph
     else: 
         env = DummyVecEnv([make_env for _ in range(n_envs)])
 
