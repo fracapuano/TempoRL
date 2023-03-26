@@ -43,37 +43,25 @@ class Policy:
 
     def create_model(self, algo, lr):
         if algo == 'ppo':
-            policy_kwargs = dict(activation_fn=torch.nn.Tanh,
-                                 net_arch=dict(pi=[64, 64], vf=[64, 64]))
             model = PPO("MlpPolicy", 
                         self.env, 
-                        policy_kwargs=policy_kwargs,
-                        learning_rate=lr, 
-                        verbose=0, 
+                        learning_rate=lr,
                         seed=self.seed, 
                         device=self.device, 
                         gamma=self.gamma)
 
         elif algo == 'sac':
-            policy_kwargs = dict(activation_fn=torch.nn.Tanh,
-                                 net_arch=dict(pi=[64, 64], qf=[64, 64]))
             model = SAC("MlpPolicy", 
                         self.env, 
-                        policy_kwargs=policy_kwargs,
-                        learning_rate=lr, 
-                        verbose=0, 
+                        learning_rate=lr,
                         seed=self.seed, 
                         device=self.device, 
                         gamma=self.gamma)
         
         elif algo == 'trpo': 
-            policy_kwargs = dict(activation_fn=torch.nn.Tanh,
-                                 net_arch=dict(pi=[64, 64], qf=[64, 64]))
             model = TRPO("MlpPolicy", 
                         self.env, 
-                        policy_kwargs=policy_kwargs,
-                        learning_rate=lr, 
-                        verbose=0, 
+                        learning_rate=lr,
                         seed=self.seed, 
                         device=self.device,
                         gamma=self.gamma)
