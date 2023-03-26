@@ -1,8 +1,8 @@
-from .BaseLaser import *
-from .env_utils import *
-from .LaserEnv_v1 import *
 from .LaserModel import *
+from .BaseLaser import *
+from .LaserEnv_v1 import *
 
+from .env_utils import *
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 from .LaserEnv_v1 import LaserEnv_v1
@@ -12,7 +12,12 @@ VersionDict = dict(
     v1=LaserEnv_v1,
 )
 
-def build_default_env(version:str="v1", n_envs:int=1, subprocess:bool=True)->VecEnv:
+def build_default_env(
+        version:str="v1", 
+        n_envs:int=1, 
+        subprocess:bool=True, 
+        device="cpu",
+        **kwargs)->VecEnv:
     """Simply builds an env using default configuration for the environment.
 
     Args: 
@@ -22,16 +27,21 @@ def build_default_env(version:str="v1", n_envs:int=1, subprocess:bool=True)->Vec
                                      the usual DummyVecEnv. Defaults to True.
     
     Returns: 
-    """
+    """    
     # define xi
     params = EnvParametrization()
     compressor_params, bounds, B_integral = params.get_parametrization()
     # define environment (on top of xi)
     def make_env():
         env = VersionDict[version](
-            bounds = bounds,
-            compressor_params = compressor_params, 
-            B_integral = B_integral)
+            # first four arguments are always the same for all LaserEnv(s)
+            bounds,
+            compressor_params, 
+            B_integral, 
+            device
+            # kwargs differentiate between different versions
+            **kwargs)
+        # wrapping using monitor
         env = Monitor(env)
         return env
 
