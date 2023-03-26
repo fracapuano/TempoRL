@@ -105,7 +105,7 @@ def main():
     # print the number of times a better env is found
     if verbose > 0: 
         print("BestsFound: ", evaluation_callback.callback.bests_found)
-        print(f"Training completed! Best models available at: {model_path}")
+        print(f"Training completed! Best models available at: {run.name}_models/")
         print(f"Avg Return over test episodes: {round(avg_return, 2)} ± {round(std_return, 2)}")
 
 if __name__=="__main__":
