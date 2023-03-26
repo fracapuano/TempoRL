@@ -1,6 +1,8 @@
 import torch
 from typing import Iterable
 
+cuda_available = torch.cuda.is_available()
+
 def iterable_to_cuda(input:Iterable[torch.tensor]) -> Iterable[torch.tensor]: 
     """This function returns an iterable containing all the tensors in the input Iterable in which the various tensors
     are sent to CUDA (if applicable). 
@@ -11,4 +13,4 @@ def iterable_to_cuda(input:Iterable[torch.tensor]) -> Iterable[torch.tensor]:
     Returns:
         Iterable[torch.tensor]: Iterable of tensors sent to CUDA. 
     """
-    return [tensor.to("cuda") if torch.cuda.is_available() else tensor for tensor in input]
+    return [tensor.to("cuda") if cuda_available else tensor for tensor in input]
