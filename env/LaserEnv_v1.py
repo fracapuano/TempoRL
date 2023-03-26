@@ -38,7 +38,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
     render_mode:str="rgb_array", 
     default_target:Tuple[bool, List[torch.TensorType]]=True, 
     init_variance:float=.1,
-    action_bounds:Tuple[float, List[float]]=0.3,
+    action_bounds:Tuple[float, List[float]]=0.1,
     device:str=device)->None:
         """Init function. Here laser-oriented characteristics are defined.
         Args:
@@ -96,8 +96,8 @@ class LaserEnv_v1(Abstract_BaseLaser):
             self.target_time, self.target_pulse = default_target
         
         # defining maximal number of steps and value for aligned-sum(L1) loss 
-        self.MAX_LOSS = 500
-        self.MAX_STEPS = 50
+        self.MAX_LOSS = 750
+        self.MAX_STEPS = 100
 
         self.rho_zero = MultivariateNormal(
             # loc is compressor params (in the 0-1 range)
