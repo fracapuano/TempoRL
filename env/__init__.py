@@ -35,12 +35,12 @@ def build_default_env(
     def make_env():
         env = VersionDict[version](
             # first four arguments are always the same for all LaserEnv(s)
-            bounds,
-            compressor_params, 
-            B_integral, 
-            device
+            bounds=bounds,
+            compressor_params=compressor_params, 
+            B_integral=B_integral, 
+            device=device,
             # kwargs differentiate between different versions
-            **kwargs)
+            env_kwargs=kwargs)
         # wrapping using monitor
         env = Monitor(env)
         return env

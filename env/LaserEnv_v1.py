@@ -40,7 +40,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
     init_variance:float=.1,
     action_bounds:Tuple[float, List[float]]=0.1,
     device:str=device,
-    **kwargs
+    env_kwargs:dict={},
     )->None:
         """
         Init function. Here laser-oriented and RL-oriented characteristics are defined.
@@ -105,9 +105,9 @@ class LaserEnv_v1(Abstract_BaseLaser):
         self.LossStoppage = False
         self.TimeStepsStoppage = False
         # reward coefficients
-        self.coeffs = kwargs.get("reward_coeffs", [1,1])
+        self.coeffs = env_kwargs.get("reward_coeffs", [1,1])
         # whether or not to reward loss decrements or actual loss values
-        self.incremental_improvement = kwargs.get("incremental_improvement", False)
+        self.incremental_improvement = env_kwargs.get("incremental_improvement", False)
         # to be used in incremental improvement analysis
         self.current_loss = None
 
