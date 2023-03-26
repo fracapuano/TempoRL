@@ -72,7 +72,7 @@ def main():
     # init wandb run
     default_name = f"{algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}"
     run = wandb.init(
-        project="DeepPulse-SPIE",
+        project=f"DeepPulse-SPIE_{env_version}",
         config=training_config,
         name= default_name if run_custom_name else None
         )
