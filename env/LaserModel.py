@@ -22,7 +22,7 @@ from utils import physics as pt
 from utils import preprocessing as pre
 from utils import *
 
-cuda_available = torch.cuda.is_available()
+cuda_available = False
 
 class ComputationalLaser: 
     def __init__(

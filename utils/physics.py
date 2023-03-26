@@ -7,7 +7,7 @@ from scipy.interpolate import UnivariateSpline
 
 from typing import Tuple, Union, List
 
-cuda_available = torch.cuda.is_available()
+cuda_available = False
 
 
 def translate_control(central_frequency:float, control:torch.TensorType, verse:str = "to_gdd")->torch.TensorType: 

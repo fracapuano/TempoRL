@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 L1Loss = torch.nn.L1Loss(reduction="sum")
-cuda_available = torch.cuda.is_available()
+cuda_available = False
 device = "cuda" if cuda_available else "cpu"
 
 class LaserEnv_v1(Abstract_BaseLaser):

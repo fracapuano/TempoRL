@@ -1,7 +1,7 @@
 import torch
 from typing import Iterable
 
-cuda_available = torch.cuda.is_available()
+cuda_available = False
 
 def iterable_to_cuda(input:Iterable[torch.tensor]) -> Iterable[torch.tensor]: 
     """This function returns an iterable containing all the tensors in the input Iterable in which the various tensors
