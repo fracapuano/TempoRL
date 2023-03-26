@@ -14,7 +14,8 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 L1Loss = torch.nn.L1Loss(reduction="sum")
-device = "cuda" if torch.cuda.is_available() else "cpu"
+cuda_available = torch.cuda.is_available()
+device = "cuda" if cuda_available else "cpu"
 
 class LaserEnv_v1(Abstract_BaseLaser):
     metadata = {
@@ -61,10 +62,10 @@ class LaserEnv_v1(Abstract_BaseLaser):
         self.ActionDim = 3
 
         # custom bounds for env
-        if not isinstance(action_bounds, list): 
-            self.action_lower_bound, self.action_upper_bound = -action_bounds, +action_bounds
-        else:
+        if isinstance(action_bounds, list): 
             self.action_lower_bound, self.action_upper_bound = action_bounds
+        else:
+            self.action_lower_bound, self.action_upper_bound = -action_bounds, +action_bounds
 
         # params init
         super().__init__(
@@ -84,8 +85,8 @@ class LaserEnv_v1(Abstract_BaseLaser):
         
         # actions are defined as deltas - updates are bounded
         self.action_space = Box(
-            low = -self.action_lower_bound * np.ones(self.ActionDim), 
-            high= +self.action_upper_bound * np.ones(self.ActionDim)
+            low = self.action_lower_bound * np.ones(self.ActionDim), 
+            high= self.action_upper_bound * np.ones(self.ActionDim)
         )
 
         self.nsteps = 0  # number of steps to converge
