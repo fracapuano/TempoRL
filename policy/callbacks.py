@@ -20,11 +20,13 @@ class StatsAgg:
             self.loss_stoppages += locals_dict["info"]["LossStoppage"]
             self.timesteps_stoppages += locals_dict["info"]["TimeStepsStoppage"]
             self.episode_lens.append(locals_dict["info"]["episode"]["l"])
+            self.terminal_loss = locals_dict["info"]["L1Loss"]
     
     def reset_stats(self):
         self.loss_stoppages = 0
         self.timesteps_stoppages = 0
         self.episode_lens = []
+        self.terminal_loss = 0
         
 class PulseTrainingCallback(BaseCallback): 
     """Custom callback inheriting from `BaseCallback`.
@@ -80,7 +82,8 @@ class PulseTrainingCallback(BaseCallback):
         wandb.log({
             "(%) LossStoppage": round(self.EvaluationStats.loss_stoppages / self.n_eval_episodes, 2),
             "(%) TimeStepsStoppage": round(self.EvaluationStats.timesteps_stoppages / self.n_eval_episodes, 2),
-            "Avg(EpisodeLen)": np.mean(self.EvaluationStats.episode_lens)
+            "Avg(EpisodeLen)": np.mean(self.EvaluationStats.episode_lens),
+            "TerminalEpisode-L1Loss": self.EvaluationStats.terminal_loss
         })
         
         # checks if this model is better than current best. If so, update current best
@@ -91,11 +94,11 @@ class PulseTrainingCallback(BaseCallback):
             self.best_model.save(path=f"{self.best_model_path}/best_model.zip")
             self.bests_found += 1
 
-        wandb.log({
-            "Mean Cumulative Reward": mean_cum_reward, 
-            "Std of Cumulative Reward": std_cum_reward,
-            "Std-Scaled Mean Cumulative Reward": mean_cum_reward / std_cum_reward
-        })
+        # wandb.log({
+        #     "Mean Cumulative Reward": mean_cum_reward, 
+        #     "Std of Cumulative Reward": std_cum_reward,
+        #     "Std-Scaled Mean Cumulative Reward": mean_cum_reward / std_cum_reward
+        # })
 
         return True
     
