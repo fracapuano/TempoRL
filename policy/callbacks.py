@@ -94,8 +94,9 @@ class PulseTrainingCallback(BaseCallback):
             self.best_model.save(path=f"{self.best_model_path}/best_model.zip")
             self.bests_found += 1
 
-        # wandb.log({
-        #     "Mean Cumulative Reward": mean_cum_reward, 
+        wandb.log({
+             "Mean Cumulative Reward": mean_cum_reward
+        })
         #     "Std of Cumulative Reward": std_cum_reward,
         #     "Std-Scaled Mean Cumulative Reward": mean_cum_reward / std_cum_reward
         # })
