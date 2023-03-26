@@ -54,9 +54,11 @@ if args.default:
 GAMMA = 0.99
 
 def main():
+    """Performs training and logs info to wandb."""
     run_custom_name = False
-    
-    """Performs training and logs training info to wandb."""
+    # build the envs according to spec
+    envs = build_default_env(version=env_version, n_envs=6, subprocess=True)
+
     # training config dictionary
     training_config = dict(
         algorithm=algorithm,
@@ -64,6 +66,8 @@ def main():
         discount_factor=GAMMA,
         train_timesteps=train_timesteps,
         random_seed=seed,
+        max_loss=envs.get_attr("MAX_LOSS")[0],
+        max_timesteps=envs.get_attr("MAX_STEPS")[0]
     )
     # init wandb run
     default_name = f"{algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}"
@@ -73,8 +77,6 @@ def main():
         name= default_name if run_custom_name else None
         )
 
-    # build the envs according to spec
-    envs = build_default_env(version=env_version, n_envs=6, subprocess=True)
     # analysing the training process with a custom callback
     pulse_callback = PulseTrainingCallback(env=envs, render=render, n_eval_episodes=test_episodes)
     # invoke pulse_callback every `evaluate_every` timesteps
