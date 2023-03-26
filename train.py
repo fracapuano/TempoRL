@@ -78,7 +78,11 @@ def main():
         )
 
     # analysing the training process with a custom callback
-    pulse_callback = PulseTrainingCallback(env=envs, render=render, n_eval_episodes=test_episodes)
+    pulse_callback = PulseTrainingCallback(
+        env=envs, 
+        render=render, 
+        n_eval_episodes=test_episodes, 
+        best_model_path=f"{run.name}_models/")
     # invoke pulse_callback every `evaluate_every` timesteps
     evaluation_callback = EveryNTimesteps(n_steps=evaluate_every, callback=pulse_callback)
     # create policy
@@ -95,7 +99,7 @@ def main():
     avg_return, std_return = policy.train(
         timesteps=train_timesteps,
         n_eval_episodes=test_episodes,
-        callback_list=[evaluation_callback], 
+        callback_list=[evaluation_callback],
         return_best_model=False
     )
     # print the number of times a better env is found
