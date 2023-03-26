@@ -51,7 +51,7 @@ if args.default:
     test_episodes=25
     evaluate_every=1e4
 
-GAMMA = 0.9
+GAMMA = 0.99
 
 def main():
     run_custom_name = False
@@ -66,12 +66,11 @@ def main():
         random_seed=seed,
     )
     # init wandb run
+    default_name = f"{algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}"
     run = wandb.init(
         project="DeepPulse-SPIE",
         config=training_config,
-        monitor_gym=True,
-        save_code=True,
-        name=f"{algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}" if run_custom_name else None
+        name= default_name if run_custom_name else None
         )
 
     # build the envs according to spec
@@ -87,19 +86,19 @@ def main():
         gamma=GAMMA,
         seed=seed, 
         load_from_pathname=model_path if resume_training else None)
-    
+        
     if verbose > 0: 
         print(f"Starting to train: {algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}")
     # train policy using evaluation callback
     avg_return, std_return = policy.train(
-        timesteps=train_timesteps, 
-        n_eval_episodes=test_episodes, 
+        timesteps=train_timesteps,
+        n_eval_episodes=test_episodes,
         callback_list=[evaluation_callback], 
         return_best_model=False
     )
-    # logging the number of times a better env is found
-    wandb.log({"BestsFound": evaluation_callback.bests_found})
+    # print the number of times a better env is found
     if verbose > 0: 
+        print("BestsFound: ", evaluation_callback.callback.bests_found)
         print(f"Training completed! Best models available at: {model_path}")
         print(f"Avg Return over test episodes: {round(avg_return, 2)} ± {round(std_return, 2)}")
 
