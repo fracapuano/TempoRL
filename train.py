@@ -51,13 +51,25 @@ if args.default:
     test_episodes=25
     evaluate_every=1e4
 
-GAMMA = 0.99
+GAMMA = 0.9
+# first coefficient is for alive term, second is for loss-related term
+COEFFS = [1., 10.]
+# if True, rewards reduction of loss. Else, rewards loss itself
+INC_IMPROVEMENT = False
 
 def main():
     """Performs training and logs info to wandb."""
     run_custom_name = False
+    env_args = {
+        "reward_coeff": COEFFS, 
+        "incremental_improvement": INC_IMPROVEMENT
+    }
     # build the envs according to spec
-    envs = build_default_env(version=env_version, n_envs=6, subprocess=True)
+    envs = build_default_env(
+        version=env_version, 
+        n_envs=6, 
+        subprocess=True, 
+        **env_args)
 
     # training config dictionary
     training_config = dict(
@@ -67,7 +79,9 @@ def main():
         train_timesteps=train_timesteps,
         random_seed=seed,
         max_loss=envs.get_attr("MAX_LOSS")[0],
-        max_timesteps=envs.get_attr("MAX_STEPS")[0]
+        max_timesteps=envs.get_attr("MAX_STEPS")[0],
+        coefficients=COEFFS, 
+        incremental_improvement=INC_IMPROVEMENT
     )
     # init wandb run
     default_name = f"{algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}"
@@ -93,8 +107,7 @@ def main():
         seed=seed, 
         load_from_pathname=model_path if resume_training else None)
         
-    if verbose > 0: 
-        print(f"Starting to train: {algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}")
+    print(f"Starting to train: {algorithm.upper()} on LaserEnv_{env_version} for {to_scientific_notation(train_timesteps)} timesteps.")
     # train policy using evaluation callback
     avg_return, std_return = policy.train(
         timesteps=train_timesteps,
