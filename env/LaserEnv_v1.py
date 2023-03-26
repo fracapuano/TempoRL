@@ -37,7 +37,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
     render_mode:str="rgb_array", 
     default_target:Tuple[bool, List[torch.TensorType]]=True, 
     init_variance:float=.1,
-    action_bounds:Tuple[float, List[float]]=0.1,
+    action_bounds:Tuple[float, List[float]]=0.3,
     device:str=device)->None:
         """Init function. Here laser-oriented characteristics are defined.
         Args:
@@ -222,7 +222,10 @@ class LaserEnv_v1(Abstract_BaseLaser):
         if self.n_steps == 0:  # episode start
             title_string = title_string if self.n_steps != 0 else "*** START *** " + title_string
             ax.get_lines()[0].set_color("red")
-        
+
+        control_info = f'Control: {[round(num, 2) for num in self._observation.tolist()]}\n'+'L1Loss: {:.4f}'.format(self._get_control_loss())
+        props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.5)
+        ax.text(0.6, 0.95, control_info, transform=ax.transAxes, fontsize=11, verticalalignment='top', bbox=props)
         ax.legend(loc="upper left", fontsize=12)
         ax.set_title(title_string, fontsize=12)
 
