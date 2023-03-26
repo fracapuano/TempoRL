@@ -39,20 +39,11 @@ class LaserEnv_v1(Abstract_BaseLaser):
     default_target:Tuple[bool, List[torch.TensorType]]=True, 
     init_variance:float=.1,
     action_bounds:Tuple[float, List[float]]=0.1,
-    device:str=device)->None:
-        """Init function. Here laser-oriented characteristics are defined.
-        Args:
-            bounds (torch.tensor): GDD, TOD and FOD upper and lower bounds. Shape must be (3x2). Values must be
-                                    expressed in SI units (i.e., s^2, s^3 and s^4).
-            compressor_params (torch.tensor): \alpha_{GDD}, \alpha_{TOD}, \alpha_{FOD} of laser compressor. If no 
-                                                non-linear effects were to take place, one would have that optimal control
-                                                parameters would be exactly equal to -compressor_params.
-            B_integral (float): B_integral value. This parameter models non-linear phase accumulation. The larger, 
-                                the higher the non-linearity introduced in the model.
-            render_mode (str, optional): Render mode. Defaults to None.
-            default_target (Tuple[bool, List[torch.TensorType], optional): Whether or not to use the default (transform-limited
-                                                                           target).When not True, accepts target time axis and temporal 
-                                                                           pulse.
+    device:str=device,
+    **kwargs
+    )->None:
+        """
+        Init function. Here laser-oriented and RL-oriented characteristics are defined.
         """
         # device on which to run computation
         self.device = device
@@ -107,10 +98,18 @@ class LaserEnv_v1(Abstract_BaseLaser):
         )
 
         # starting with random parameters
-        self._observation = torch.clip(self.rho_zero.sample(), torch.zeros(self.StateDim), torch.ones(self.StateDim))
+        self._observation = torch.clip(self.rho_zero.sample(), 
+                                       torch.zeros(self.StateDim), 
+                                       torch.ones(self.StateDim))
         # storing info related to why has the episode stopped
         self.LossStoppage = False
         self.TimeStepsStoppage = False
+        # reward coefficients
+        self.coeffs = kwargs.get("reward_coeffs", [1,1])
+        # whether or not to reward loss decrements or actual loss values
+        self.incremental_improvement = kwargs.get("incremental_improvement", False)
+        # to be used in incremental improvement analysis
+        self.current_loss = None
 
     def get_observation_SI(self):
         """
@@ -147,6 +146,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
         """Resets the environment to initial observations"""
         self._observation = torch.clip(self.rho_zero.sample(), torch.zeros(self.StateDim), torch.ones(self.StateDim))
         self.n_steps = 0
+        self.current_loss = None
 
         if self.render_mode == "human":
             self.render()
@@ -184,11 +184,14 @@ class LaserEnv_v1(Abstract_BaseLaser):
                    Component.
         """
         healthy_reward = 2  # small constant, reward for having not failed yet.
-        loss_penalty = self._get_control_loss()
-        action_penalty = (torch.norm(torch.from_numpy(action)) / torch.sqrt(torch.tensor(3))).item()  # 0-1 range
+        if self.incremental_improvement:
+            loss_penalty = self._get_control_loss() - self.current_loss  # rewarding reducing the loss
+        else:
+            loss_penalty = self._get_control_loss()  # reward small values of loss
+
         # v1 does not take into account actions magnitude nor healthy reward
-        coeff_healthy, coeff_loss, coeff_drastic = 0.0, 1, 0.0 
-        return coeff_healthy * healthy_reward - coeff_loss * loss_penalty - coeff_drastic * action_penalty
+        coeff_healthy, coeff_loss = self.coeffs
+        return coeff_healthy * healthy_reward - coeff_loss * loss_penalty
 
     def step(self, action:torch.TensorType):
         """
@@ -196,7 +199,8 @@ class LaserEnv_v1(Abstract_BaseLaser):
         """
         # increment number of steps
         self.n_steps += 1
-        # applying action, clipping on +1 and -1
+        self.current_loss = self._get_control_loss()
+        # applying action, clipping between 0 and 1
         self._observation = torch.clip(self._observation + torch.from_numpy(action), min=torch.zeros(3), max=torch.ones(3))
         
         reward = self.compute_reward(state=self._observation, action=action)
