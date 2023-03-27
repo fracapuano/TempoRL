@@ -83,6 +83,10 @@ def main():
         coefficients=COEFFS, 
         incremental_improvement=INC_IMPROVEMENT
     )
+
+    if verbose > 0: 
+        print(training_config)
+
     # init wandb run
     default_name = f"{algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}"
     run = wandb.init(
