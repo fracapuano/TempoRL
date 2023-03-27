@@ -18,7 +18,7 @@ def parse_args()->object:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--algorithm", default="PPO", type=str, help="RL Algorithm. One in ['TRPO', 'PPO', 'SAC']")
-    parser.add_argument("--env-version", default="v1", type=str, help="Version of custom env to use. One in [...]")
+    parser.add_argument("--env-version", default="v1", type=str, help="Version of custom env to use. One in [v1, v2]")
     parser.add_argument("--verbose", default=0, type=int, help="Verbosity value")
     parser.add_argument("--train-timesteps", default=1e5, type=float, help="Number of timesteps to train the RL algorithm with")
     parser.add_argument("--evaluation-frequency", default=1e4, type = float, help="Frequency with which to evaluate policy against random fair opponent")
@@ -31,6 +31,7 @@ def parse_args()->object:
     parser.add_argument("--increment", default=False, type=boolean_string, help="Use actual value or difference in values for different envs")
     parser.add_argument("--healthy-coeff", default=0.1, type=float, help="Healthy-reward coefficientf")
     parser.add_argument("--performance-coeff", default=1., type=float, help="Performance reward coefficient")
+    parser.add_argument("--n-envs", default=1, type=int, help="Number of different envs to create at training time")
 
     parser.add_argument("--default", action="store_true", help="Default mode, ignore all configurations")
     return parser.parse_args()
@@ -50,6 +51,7 @@ seed=args.seed
 GAMMA=args.gamma
 INC_IMPROVEMENT=args.increment
 COEFFS=[args.healthy_coeff, args.performance_coeff]
+n_envs=args.n_envs
 
 if args.default: 
     algorithm="PPO"
@@ -68,7 +70,7 @@ def main():
     # build the envs according to spec
     envs = build_default_env(
         version=env_version, 
-        n_envs=6, 
+        n_envs=n_envs, 
         subprocess=True, 
         **env_args)
 
@@ -91,7 +93,7 @@ def main():
     # init wandb run
     default_name = f"{algorithm.upper()}{env_version}_{to_scientific_notation(train_timesteps)}"
     run = wandb.init(
-        project=f"DeepPulse-SPIE_{env_version}",
+        project=f"DeepPulse_{env_version}-Final",
         config=training_config,
         name= default_name if run_custom_name else None
         )
