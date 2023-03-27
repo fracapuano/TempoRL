@@ -137,6 +137,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
         info = {
             "current_control": self._observation,
             "L1Loss": self._get_control_loss(),
+            "Inc-L1Loss": self._get_control_loss() - self.current_loss,
             "LossStoppage": self.LossStoppage,
             "TimeStepsStoppage": self.TimeStepsStoppage,
         }
@@ -183,11 +184,11 @@ class LaserEnv_v1(Abstract_BaseLaser):
             float: Value of reward. Sum of three different components. Namely: Error-Component, Action-Magnitude-Component, Number-of-Steps 
                    Component.
         """
-        healthy_reward = 2  # small constant, reward for having not failed yet.
+        healthy_reward = 1  # small constant, reward for having not failed yet.
         if self.incremental_improvement:
-            loss_penalty = self._get_control_loss() - self.current_loss  # rewarding reducing the loss
+            loss_penalty = (self._get_control_loss() - self.current_loss) / self.current_loss  # rewarding reducing the loss
         else:
-            loss_penalty = self._get_control_loss()  # reward small values of loss
+            loss_penalty = self._get_control_loss() / self.MAX_LOSS  # reward small values of loss
 
         # v1 does not take into account actions magnitude nor healthy reward
         coeff_healthy, coeff_loss = self.coeffs
@@ -228,9 +229,9 @@ class LaserEnv_v1(Abstract_BaseLaser):
             title_string = title_string if self.n_steps != 0 else "*** START *** " + title_string
             ax.get_lines()[0].set_color("red")
 
-        control_info = f'Control: {[round(num, 2) for num in self._observation.tolist()]}\n'+'L1Loss: {:.4f}'.format(self._get_control_loss())
+        control_info = f'Control: {[round(num, 4) for num in self._observation.tolist()]}\n'+'L1Loss: {:.4f}'.format(self._get_control_loss())
         props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.5)
-        ax.text(0.6, 0.95, control_info, transform=ax.transAxes, fontsize=11, verticalalignment='top', bbox=props)
+        ax.text(0.6, 0.95, control_info, transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=props)
         ax.legend(loc="upper left", fontsize=12)
         ax.set_title(title_string, fontsize=12)
 
