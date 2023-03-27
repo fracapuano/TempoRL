@@ -1,9 +1,9 @@
 """
 Trains a given policy on the laser environment.
 """
-from env.LaserEnv_v1 import LaserEnv_v1
-from env.env_utils import EnvParametrization
-from utils import reverseAlgoDict
+from env import get_default_env
+from policy.policy import Policy
+import numpy as np
 import argparse
 
 trainsteps_dict = {
@@ -23,66 +23,65 @@ def parse_args()->object:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--algorithm", default="PPO", type=str, help="RL Algorithm. One in ['TRPO', 'PPO', 'A2C', 'SAC']")
+    parser.add_argument("--env-version", default="v1", type=str, help="Version of custom env to use. One in ['v1', 'v2']")
     parser.add_argument("--verbose", default=0, type=int, help="Verbosity value")
     parser.add_argument("--test-episodes", default=50, type=int, help="Number of test matches the agent plays during periodic evaluation")
     parser.add_argument("--model-path", default=None, type=str, help="Model path")
-    parser.add_argument("--render", default=False, type=boolean_string, help="Whether or not to render the environment")
+    parser.add_argument("--render", action="store_true", help="Whether or not to render the environment")
+    parser.add_argument("--seed", default=777, type=int, help="Random seed")
     
-    parser.add_argument("--default", default=True, type=boolean_string, help="Default mode, ignore all configurations")
+    parser.add_argument("--default", action="store_true", help="Default mode, ignore all configurations")
     return parser.parse_args()
 
 args = parse_args()
 
 algorithm=args.algorithm
+env_version=args.env_version
 verbose=args.verbose
 render=args.render
 test_episodes=args.test_episodes
 model_path=args.model_path
+render=args.render
+seed=args.seed
 
 if args.default: 
     algorithm="PPO"
-    verbose=2
+    verbose=1
     test_episodes=50
     render=True
-    model_path="trainedmodels"
+    model_path="models/earthy-jazz-6_models/best_model.zip"
 
 def main(): 
-    # no seed is setted, but it can be easily done uncommenting the following lines
-    seed = None
-    # np.random.seed(seed)
-    # random.seed(seed)
-
-    checkpoint_frequency = 25_000
-
-    if algorithm.upper() not in ["TRPO", "PPO", "A2C", "SAC"]:
-        print(f"Prompted algorithm (upper): {algorithm.upper()}")
-        raise ValueError("Algorithm currently supported are ['TRPO', 'PPO', 'A2C', 'SAC'] only!")
-
-    # define version (for accessing the trained model)
-    version = "v1"
-    # define xi
-    params = EnvParametrization()
-    compressor_params, bounds, B_integral = params.get_parametrization()
-    # define the environment (on top of xi)
-    env = LaserEnv_v1(
-        bounds = bounds, 
-        compressor_params = compressor_params, 
-        B_integral = B_integral, 
-        render_mode="human")
-            
-    model_function = reverseAlgoDict[algorithm.upper()]
-    model = model_function.load(model_path)
-    # setting the name for filenames
+    # build the envs according to spec
+    env = get_default_env(
+        version=env_version, 
+        render_mode="human" if render else "rgb_array"
+    )
     
-    for _ in range(test_episodes): 
+    # create policy - loading pretrained model
+    policy = Policy(
+        algo=algorithm,
+        env=env,
+        seed=seed, 
+        load_from_pathname=model_path) 
+    
+    episodes_rewards = np.zeros(test_episodes)
+    for ep in range(test_episodes):
+        episode_rewards = []
         obs = env.reset()
         done = False
         while not done:
-            action, _ = model.predict(obs)
-            obs, _, done, info = env.step(action)
+            action, _ = policy.predict(obs, deterministic=True)
+            obs, reward, done, _ = env.step(action)
+            episode_rewards.append(reward)
 
-            if render: 
+            if render:
                 env.render()
+        
+        episodes_rewards[ep] = np.mean(episode_rewards)
+    
+    if verbose: 
+        print(f"Avg-Cumulative reward over {test_episodes}: {np.mean(episodes_rewards)}")
 
 if __name__ == "__main__": 
     main()
