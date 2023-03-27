@@ -70,14 +70,14 @@ class LaserEnv_v1(Abstract_BaseLaser):
 
         # specifiying obs space
         self.observation_space = Box(
-             low = np.zeros(self.StateDim), 
-             high = np.ones(self.StateDim)
+             low = np.zeros(self.StateDim, dtype=np.float32), 
+             high = np.ones(self.StateDim, dtype=np.float32)
         )
         
         # actions are defined as deltas - updates are bounded
         self.action_space = Box(
-            low = self.action_lower_bound * np.ones(self.ActionDim), 
-            high= self.action_upper_bound * np.ones(self.ActionDim)
+            low = self.action_lower_bound * np.ones(self.ActionDim, dtype=np.float32), 
+            high= self.action_upper_bound * np.ones(self.ActionDim, dtype=np.float32)
         )
 
         self.nsteps = 0  # number of steps to converge
