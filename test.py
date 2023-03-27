@@ -5,6 +5,7 @@ from env import get_default_env
 from policy.policy import Policy
 import numpy as np
 import argparse
+from rich.progress import track
 
 trainsteps_dict = {
     1e4: "1e4", 
@@ -66,7 +67,7 @@ def main():
         load_from_pathname=model_path) 
     
     episodes_rewards = np.zeros(test_episodes)
-    for ep in range(test_episodes):
+    for ep in track(range(test_episodes), description="Testing episodes..."):
         episode_rewards = []
         obs = env.reset()
         done = False
