@@ -265,6 +265,10 @@ class LaserEnv_v1(Abstract_BaseLaser):
 
             if getattr(self, "clock", None) is None:
                 self.clock = pygame.time.Clock()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
             
             # converting RGB array to something meaningful
             visual_rgb_array = np.transpose(self._render_pulse(), axes=(1, 0, 2))
