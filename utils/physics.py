@@ -9,6 +9,8 @@ from typing import Tuple, Union, List
 
 cuda_available = False
 
+"""TODO: Fix typing and documentation of functions"""
+
 
 def translate_control(central_frequency:float, control:torch.TensorType, verse:str = "to_gdd")->torch.TensorType: 
         """This function translates the control quantities either from Dispersion coefficients (the di's) to GDD, TOD and FOD using a system of 
