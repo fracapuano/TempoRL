@@ -12,6 +12,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3 import PPO, SAC
 from sb3_contrib import TRPO
 from typing import List
+import warnings
 
 class Policy:
     def __init__(self,
@@ -24,7 +25,7 @@ class Policy:
                  load_from_pathname=None):
 
         if not isinstance(env, VecEnv): 
-            raise ValueError(f"Env {env} is not a VecEnv!")
+            warnings.warn(f"Env {env} is not a VecEnv!")
         # else: env = make_vec_env(env, n_envs=1, seed=seed, vec_env_cls=DummyVecEnv)
 
         self.seed = seed
@@ -71,11 +72,11 @@ class Policy:
 
     def load_model(self, algo, pathname):
         if algo == 'ppo':
-            model = PPO.load(pathname, env=self.env, device=self.device)
+            model = PPO.load(pathname)
         elif algo == 'trpo':
-            model = TRPO.load(pathname, env=self.env, device=self.device)
+            model = TRPO.load(pathname)
         elif algo == 'sac':
-            model = SAC.load(pathname, env=self.env, device=self.device)
+            model = SAC.load(pathname)
         else:
             raise ValueError(f"RL Algo not supported: {algo}. Supported algorithms ['trpo', 'ppo', 'sac']")
         return model
