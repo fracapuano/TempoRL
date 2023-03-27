@@ -27,6 +27,10 @@ def parse_args()->object:
     parser.add_argument("--model-path", default="models/", type=str, help="Path to which the model to incrementally train is stored")
     parser.add_argument("--render", action="store_true", help="Boolean flag related to whether or not to render the env")
     parser.add_argument("--seed", default=777, type=int, help="Random seed setted")
+    parser.add_argument("--gamma", default=0.9, type=float, help="Discount factor")
+    parser.add_argument("--increment", default=False, type=boolean_string, help="Use actual value or difference in values for different envs")
+    parser.add_argument("--healthy-coeff", default=0.1, type=float, help="Healthy-reward coefficientf")
+    parser.add_argument("--performance-coeff", default=1., type=float, help="Performance reward coefficient")
 
     parser.add_argument("--default", action="store_true", help="Default mode, ignore all configurations")
     return parser.parse_args()
@@ -43,6 +47,9 @@ resume_training=args.resume_training
 model_path=args.model_path
 render=args.render
 seed=args.seed
+GAMMA=args.gamma
+INC_IMPROVEMENT=args.increment
+COEFFS=[args.healthy_coeff, args.performance_coeff]
 
 if args.default: 
     algorithm="PPO"
@@ -50,12 +57,6 @@ if args.default:
     train_timesteps=2e5
     test_episodes=25
     evaluate_every=1e4
-
-GAMMA = 0.9
-# first coefficient is for alive term, second is for loss-related term
-COEFFS = [1., 10.]
-# if True, rewards reduction of loss. Else, rewards loss itself
-INC_IMPROVEMENT = False
 
 def main():
     """Performs training and logs info to wandb."""
