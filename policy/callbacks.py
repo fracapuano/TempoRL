@@ -169,14 +169,14 @@ class IntensityTrainingCallback(BaseCallback):
             "(%) TimeStepsStoppage": round(self.EvaluationStats.timesteps_stoppages / self.n_eval_episodes, 2),
             "Avg(EpisodeLen)": np.mean(self.EvaluationStats.episode_lens),
             "Avg(TerminalState-L1Loss)": np.mean(self.EvaluationStats.terminal_loss),
-            "Min(Final-FWHM)": np.min(self.EvaluationStats.final_FWHM), 
-            "Max(Final-FWHM)": np.max(self.EvaluationStats.final_FWHM),
-            "Avg(Final-FWHM)": np.mean(self.EvaluationStats.final_FWHM),
-            "Std(Final-FWHM)": np.std(self.EvaluationStats.final_FWHM),
-            "Min(Final-PeakIntensity)": np.min(self.EvaluationStats.final_Intensity), 
-            "Max(Final-PeakIntensity)": np.max(self.EvaluationStats.final_Intensity),
-            "Avg(Final-PeakIntensity)": np.mean(self.EvaluationStats.final_Intensity),
-            "Std(Final-PeakIntensity)": np.std(self.EvaluationStats.final_Intensity),
+            "Min(Final-FWHM) (ps)": np.min(self.EvaluationStats.final_FWHM), 
+            "Max(Final-FWHM) (ps)": np.max(self.EvaluationStats.final_FWHM),
+            "Avg(Final-FWHM) (ps)": np.mean(self.EvaluationStats.final_FWHM),
+            "Std(Final-FWHM) (ps)": np.std(self.EvaluationStats.final_FWHM),
+            "Min(Final-PeakIntensity) (TW/m^2)": np.min(self.EvaluationStats.final_Intensity) * 1e-12, 
+            "Max(Final-PeakIntensity) (TW/m^2)": np.max(self.EvaluationStats.final_Intensity) * 1e-12,
+            "Avg(Final-PeakIntensity) (TW/m^2)": np.mean(self.EvaluationStats.final_Intensity) * 1e-12,
+            "Std(Final-PeakIntensity) (TW/m^2)": np.std(self.EvaluationStats.final_Intensity) * 1e-12,
         })
         
         # checks if this model is better than current best. If so, update current best
