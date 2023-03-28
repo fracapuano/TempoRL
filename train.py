@@ -1,5 +1,5 @@
 from policy.policy import Policy
-from policy.callbacks import PulseTrainingCallback
+from policy.callbacks import PulseTrainingCallback, IntensityTrainingCallback
 from stable_baselines3.common.callbacks import EveryNTimesteps
 import wandb
 import argparse
@@ -98,12 +98,22 @@ def main():
         name= default_name if run_custom_name else None
         )
 
-    # analysing the training process with a custom callback
-    pulse_callback = PulseTrainingCallback(
-        env=envs, 
-        render=render, 
-        n_eval_episodes=test_episodes, 
-        best_model_path=f"{run.name}_models/")
+    # analysing the training process with a custom callback, varying
+    # with respect to the environment version
+    if env_version == "v1":
+        pulse_callback = PulseTrainingCallback(
+            env=envs, 
+            render=render, 
+            n_eval_episodes=test_episodes, 
+            best_model_path=f"{run.name}_models/"
+            )
+    elif env_version == "v2":
+        pulse_callback = IntensityTrainingCallback(
+            env=envs, 
+            render=render, 
+            n_eval_episodes=test_episodes, 
+            best_model_path=f"{run.name}_models/"
+            )
     # invoke pulse_callback every `evaluate_every` timesteps
     evaluation_callback = EveryNTimesteps(n_steps=evaluate_every, callback=pulse_callback)
     # create policy
