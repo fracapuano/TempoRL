@@ -23,7 +23,7 @@ def parse_args()->object:
         (object): args parser
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--algorithm", default="PPO", type=str, help="RL Algorithm. One in ['TRPO', 'PPO', 'A2C', 'SAC']")
+    parser.add_argument("--algorithm", default="PPO", type=str, help="RL Algorithm. One in ['TRPO', 'PPO', 'SAC']")
     parser.add_argument("--env-version", default="v1", type=str, help="Version of custom env to use. One in ['v1', 'v2']")
     parser.add_argument("--verbose", default=0, type=int, help="Verbosity value")
     parser.add_argument("--test-episodes", default=50, type=int, help="Number of test matches the agent plays during periodic evaluation")
