@@ -1,4 +1,5 @@
 import torch
+torch.set_num_threads(1)  # to allow multiprocessing
 import numpy as np
 from typing import Tuple, List
 from gym.spaces import Box
