@@ -258,10 +258,16 @@ class LaserEnv_v1(Abstract_BaseLaser):
         if self.n_steps == 0:  # episode start
             title_string = title_string if self.n_steps != 0 else "*** START *** " + title_string
             ax.get_lines()[0].set_color("red")
-
-        control_info = f'Control: {[round(num, 4) for num in self._observation.tolist()]}\n'+'L1Loss: {:.4f}'.format(self._get_control_loss())
-        props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.5)
-        ax.text(0.6, 0.95, control_info, transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=props)
+        
+        knobs = self._observation.tolist()
+        control_info = 'GDD: {:2.2e}\n'.format(knobs[0])+\
+                       'TOD: {:2.2e}\n'.format(knobs[1])+\
+                       'FOD: {:2.2e}\n'.format(knobs[2])+\
+                       'L1Loss: {:.4f}\n'.format(self._get_control_loss())+\
+                       'B-integral: {:.4f}'.format(self.laser.B)
+        
+        props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.2)
+        ax.text(0.7, 0.95, control_info, transform=ax.transAxes, fontsize=11, verticalalignment='top', bbox=props)
         ax.legend(loc="upper left", fontsize=12)
         ax.set_title(title_string, fontsize=12)
 
