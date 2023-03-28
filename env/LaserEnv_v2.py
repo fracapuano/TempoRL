@@ -230,7 +230,7 @@ class LaserEnv_v2(Abstract_BaseLaser):
             intensity_reward = self.peak_intensity - self.current_intensity  # rewarding variations of intensity
         else: 
             x = self.peak_intensity / self.TL_intensity # rewarding intensity itself
-            intensity_reward = np.clip(0.2 / (1-x), 5)  # asymptotically rewarding higher intensities
+            intensity_reward = np.clip(0.2 / (1-x), a_max=5)  # asymptotically rewarding higher intensities
         # reward coefficients
         coeff_healthy, coeff_intensity = self.coeffs
 
