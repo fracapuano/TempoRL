@@ -1,7 +1,8 @@
 import torch
 import matplotlib.pyplot as plt
 from .physics import peak_on_peak
-from typing import Tuple, List
+from typing import List
+import numpy as np
 from collections import deque
 
 def visualize_pulses(
@@ -42,7 +43,7 @@ def visualize_pulses(
     
     ax.set_xlabel("Time (s)", fontsize=12)
     ax.set_ylabel("Intensity (a.u.)", fontsize=12)
-    ax.set_xlim(-4e-11, 4e-11)
+    ax.set_xlim(-8e-12, 8e-12)
     ax.legend()
 
     return fig, ax
@@ -50,5 +51,26 @@ def visualize_pulses(
 def visualize_controls(
         controls_buffer:deque
 ):
-    """Renders a precise control buffer."""
-    pass
+    """Renders a series of observation in the control space."""
+    controls = np.array(controls_buffer, dtype=object)
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(projection = "3d")
+    # setting bounds to the plot
+    ax.set_xlim3d(0,1)
+    ax.set_ylim3d(0,1)
+    ax.set_zlim3d(0,1)
+    # labels to axis
+    ax.set_xlabel("GDD (a.u.)", fontsize=12)
+    ax.set_ylabel("TOD (a.u.)", fontsize=12)
+    ax.set_zlabel("FOD (a.u.)", fontsize=12)
+    
+    line, = ax.plot([], [], [], label = "Controls Applied"); scatt = ax.scatter([],[],[], s = 50, c = "red")
+    GDDs, TODs, FODs = controls[:, 0], controls[:, 1], controls[:, 2]
+    # drawing a line between controls
+    line.set_data(GDDs, TODs); line.set_3d_properties(FODs)
+    # scatter plot of applied controls
+    scatt._offsets3d = GDDs, TODs, FODs
+    ax.legend(loc = "upper right", framealpha = 1., fontsize=12)
+
+    return fig, ax

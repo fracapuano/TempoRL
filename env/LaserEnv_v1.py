@@ -3,11 +3,12 @@ import numpy as np
 from typing import Tuple, List
 from gym.spaces import Box
 from torch.distributions.multivariate_normal import MultivariateNormal
+from collections import deque
 
 from .BaseLaser import Abstract_BaseLaser
 from .env_utils import ControlUtils
 from utils import physics
-from utils.render import visualize_pulses
+from utils.render import visualize_pulses, visualize_controls
 import pygame
 
 import matplotlib.pyplot as plt
@@ -57,8 +58,20 @@ class LaserEnv_v1(Abstract_BaseLaser):
             self.action_lower_bound, self.action_upper_bound = action_bounds
         else:
             self.action_lower_bound, self.action_upper_bound = -action_bounds, +action_bounds
+        
+        # actual action range
+        self.action_range = self.action_upper_bound - self.action_lower_bound
 
-        # params init
+        # keeping a buffer of observations
+        obs_buffer_size = 5
+        self.past_observation_buffer = deque(maxlen=obs_buffer_size)
+
+        # reward coefficients
+        self.coeffs = env_kwargs.get("reward_coeffs", [1,1])
+        # whether or not to reward loss decrements or actual loss values
+        self.incremental_improvement = env_kwargs.get("incremental_improvement", False)
+        
+        # env parametrization init - chagepoint for different xi's.
         super().__init__(
              bounds=bounds, 
              compressor_params=compressor_params, 
@@ -76,11 +89,10 @@ class LaserEnv_v1(Abstract_BaseLaser):
         
         # actions are defined as deltas - updates are bounded
         self.action_space = Box(
-            low = self.action_lower_bound * np.ones(self.ActionDim, dtype=np.float32), 
-            high= self.action_upper_bound * np.ones(self.ActionDim, dtype=np.float32)
+            low = -1 * np.ones(self.ActionDim, dtype=np.float32), 
+            high= +1 * np.ones(self.ActionDim, dtype=np.float32)
         )
-
-        self.nsteps = 0  # number of steps to converge
+        
         if default_target is True:
             self.target_time, self.target_pulse = self.laser.transform_limited()
         else: 
@@ -96,20 +108,24 @@ class LaserEnv_v1(Abstract_BaseLaser):
             # homoscedastic distribution
             covariance_matrix=torch.diag(init_variance * torch.ones(self.StateDim))
         )
-
-        # starting with random parameters
-        self._observation = torch.clip(self.rho_zero.sample(), 
-                                       torch.zeros(self.StateDim), 
-                                       torch.ones(self.StateDim))
-        # storing info related to why has the episode stopped
-        self.LossStoppage = False
-        self.TimeStepsStoppage = False
-        # reward coefficients
-        self.coeffs = env_kwargs.get("reward_coeffs", [1,1])
-        # whether or not to reward loss decrements or actual loss values
-        self.incremental_improvement = env_kwargs.get("incremental_improvement", False)
-        # to be used in incremental improvement analysis
-        self.current_loss = None
+        # setting the simulator in empty state
+        self.reset()
+ 
+    def remap_action(self, action:np.ndarray)->np.ndarray:
+        """
+        Remaps the action (sampled from action space) to fit the [self.action_lower_bound,
+        self.action_upper bound] range defined for the actual problem.
+        For more info on why we need to perform action normalization, consider checking: 
+        https://stable-baselines3.readthedocs.io/en/master/guide/rl_tips.html
+        Args: 
+            action (np.array): Action sampled from self.action_space (in the [-1, +1] range).
+        Returns: 
+            np.array: Action in the [self.action_lower_bound, self.action_upper_bound] range.
+        """
+        normalized_range = 2  # normalized_range = normalized_upper - normalized_lower = +1 - (-1) = 2
+        ratio = self.action_range / normalized_range
+        # re-normalizing (y = lb + ration * (x - (-1)))
+        return self.action_lower_bound + ratio * (action + 1)
 
     def get_observation_SI(self):
         """
@@ -145,12 +161,20 @@ class LaserEnv_v1(Abstract_BaseLaser):
 
     def reset(self, seed:int=None, options=None)->None: 
         """Resets the environment to initial observations"""
-        self._observation = torch.clip(self.rho_zero.sample(), torch.zeros(self.StateDim), torch.ones(self.StateDim))
+        # timesteps in an episode
         self.n_steps = 0
+        # starting condition (random)
+        self._observation = torch.clip(self.rho_zero.sample(), 
+                                       torch.zeros(self.StateDim), 
+                                       torch.ones(self.StateDim))
+        # storing info related to why has the episode stopped
+        self.LossStoppage = False
+        self.TimeStepsStoppage = False
+        
+        # to be used in incremental improvement analysis
         self.current_loss = None
-
-        if self.render_mode == "human":
-            self.render()
+        # clearing up the observations buffer
+        self.past_observation_buffer.clear()
 
         return self._get_obs()
 
@@ -201,8 +225,14 @@ class LaserEnv_v1(Abstract_BaseLaser):
         # increment number of steps
         self.n_steps += 1
         self.current_loss = self._get_control_loss()
-        # applying action, clipping between 0 and 1
-        self._observation = torch.clip(self._observation + torch.from_numpy(action), min=torch.zeros(3), max=torch.ones(3))
+        # storing the current observation
+        self.past_observation_buffer.append(self._observation.numpy())
+        # scaling the action to the actual range
+        rescaled_action = self.remap_action(action=action)  # here action is in numpy
+        # applying (rescaled) action, clipping between 0 and 1
+        self._observation = torch.clip(self._observation + torch.from_numpy(rescaled_action), 
+                                       min=torch.zeros(3), 
+                                       max=torch.ones(3))
         
         reward = self.compute_reward(state=self._observation, action=action)
         done = self.is_done()
@@ -247,7 +277,25 @@ class LaserEnv_v1(Abstract_BaseLaser):
         """
         Renders the evolution of control parameters in feasible space with respect to a size `n` deque.
         """
-        raise NotImplementedError("This method has not been implemented yet (be patient!).")
+        fig, ax = visualize_controls(self.past_observation_buffer)
+        # specializing the plots for showcasing trajectories
+        title_string = f"Timestep {self.n_steps}/{self.MAX_STEPS}"
+        if self.n_steps == 0:  # episode start
+            title_string = title_string if self.n_steps != 0 else "*** START *** " + title_string
+            ax.get_lines()[0].set_color("red")
+        
+        control_info = f'Control: {[round(num, 4) for num in self._observation.tolist()]}\n'+'L1Loss: {:.4f}'.format(self._get_control_loss())
+        #props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.5)
+        #ax.text(0.6, 0.95, control_info, transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=props)
+        ax.set_title(title_string, fontsize=12)
+
+        # creating and coloring the canvas
+        fig.canvas.draw()
+        X = np.array(fig.canvas.renderer.buffer_rgba())
+        controls_rgb_array = np.array(Image.fromarray(X).convert('RGB'))
+        plt.close(fig)
+
+        return controls_rgb_array
 
     def _render_frame(self): 
         """
@@ -257,7 +305,7 @@ class LaserEnv_v1(Abstract_BaseLaser):
             return np.transpose(self._render_pulse(), axes=(1, 0, 2))
         
         elif self.render_mode == "human":  # renders using pygame
-            screen_size = (640, 480)
+            screen_size = (1280, 480)
 
             if getattr(self, "window", None) is None:
                 pygame.init()
@@ -272,12 +320,20 @@ class LaserEnv_v1(Abstract_BaseLaser):
                     pygame.quit()
             
             # converting RGB array to something meaningful
-            visual_rgb_array = np.transpose(self._render_pulse(), axes=(1, 0, 2))
-            # creating the surface from the pulse surface
-            pulses_surf = pygame.surfarray.make_surface(visual_rgb_array) 
-            # rescaling the surface to fit screen size
-            pulses_surf = pygame.transform.scale(pulses_surf, screen_size)
+            pulse_rgb_array = np.transpose(self._render_pulse(), 
+                                            axes=(1, 0, 2))
+            controls_rgb_array = np.transpose(self._render_controls(),
+                                              axes=(1, 0, 2))
+            
+            # creating the surface from pulse array
+            pulses_surf = pygame.surfarray.make_surface(pulse_rgb_array) 
+            # creating the surface from the control array
+            controls_surf = pygame.surfarray.make_surface(controls_rgb_array) 
+            # rescaling the surfaces to fit screen size
+            pulses_surf = pygame.transform.scale(pulses_surf, (screen_size[0]//2, screen_size[1]))
+            controls_surf = pygame.transform.scale(controls_surf, (screen_size[0]//2, screen_size[1]))
             self.window.blit(pulses_surf, (0, 0))
+            self.window.blit(controls_surf, (screen_size[0]//2, 0))
             pygame.event.pump()
             self.clock.tick(self.metadata["render_fps"])
             pygame.display.flip()
