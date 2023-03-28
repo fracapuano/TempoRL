@@ -63,7 +63,7 @@ class Abstract_BaseLaser(gym.Env):
         return self._compressor_params
 
     @B.setter
-    def update_B(self, new_B:int)->None: 
+    def update_B(self, new_B:float)->None: 
         """Updates the value of B integral. When updating, also updates the laser changing the value
         of laser's B."""
 
