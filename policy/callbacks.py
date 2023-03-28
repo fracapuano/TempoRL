@@ -180,7 +180,7 @@ class IntensityTrainingCallback(BaseCallback):
         })
         
         # checks if this model is better than current best. If so, update current best
-        if mean_cum_reward / std_cum_reward >= self.best_model_reward_over_std:
+        if mean_cum_reward / std_cum_reward >= self.best_model_mean_reward:
             self.best_model = self.model
             self.best_model_mean_reward = mean_cum_reward
             # save best model
