@@ -1,5 +1,5 @@
 import torch
-import gymnasium as gym
+import gym
 from .env_utils import instantiate_laser
 from utils import *
 
