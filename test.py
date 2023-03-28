@@ -69,13 +69,16 @@ def main():
     episodes_rewards = np.zeros(test_episodes)
     for ep in track(range(test_episodes), description="Testing episodes..."):
         episode_rewards = []
+        episode_losses=[]
         obs = env.reset()
         done = False
         while not done:
             action, _ = policy.predict(obs, deterministic=True)
-            obs, reward, done, _ = env.step(action)
-            episode_rewards.append(reward)
+            obs, reward, done, info = env.step(action)
 
+            episode_rewards.append(reward)
+            episode_losses.append(info["L1Loss"])
+            
             if render:
                 env.render()
         
