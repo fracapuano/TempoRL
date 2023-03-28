@@ -81,7 +81,7 @@ def main():
         discount_factor=GAMMA,
         train_timesteps=train_timesteps,
         random_seed=seed,
-        max_loss=envs.get_attr("MAX_LOSS")[0],
+        upper_bound=envs.get_attr("MAX_LOSS")[0] if env_version=="v1" else envs.get_attr("MAX_DURATION")[0],
         max_timesteps=envs.get_attr("MAX_STEPS")[0],
         coefficients=COEFFS, 
         incremental_improvement=INC_IMPROVEMENT
