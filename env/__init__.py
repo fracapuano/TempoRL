@@ -6,12 +6,12 @@ from .env_utils import *
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 from .LaserEnv_v1 import LaserEnv_v1
-# from .LaserEnv_v2 import LaserEnv_v2
+from .LaserEnv_v2 import LaserEnv_v2
 from stable_baselines3.common.monitor import Monitor
 
 VersionDict = dict(
     v1=LaserEnv_v1,
-    # v2=LaserEnv_v2
+    v2=LaserEnv_v2
 )
 
 def build_default_env(
