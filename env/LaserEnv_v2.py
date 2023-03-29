@@ -285,7 +285,7 @@ class LaserEnv_v2(Abstract_BaseLaser):
         
         energy_info = 'L1Loss: {:.4f}\n'.format(self.transform_limited_regret())+\
                       'FWHM (ps): {:2.2f}\n'.format(self._get_info()["current FWHM (ps)"])+\
-                      'PI (TW/m^2): {:2.2e}'.format(self._get_info()["current Peak Intensity (TW/m^2)"])
+                      'x: {:2.2f}'.format(100 * self._get_info()["current Peak Intensity (TW/m^2)"] / (self.TL_intensity * 1e-12))
         
         props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.5)
         ax.text(0.7, 0.95, control_info, transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=props)
