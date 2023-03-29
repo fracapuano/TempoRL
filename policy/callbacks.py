@@ -19,7 +19,7 @@ class StatsAgg:
         if locals_dict["done"]:
             self.loss_stoppages += locals_dict["info"].get("LossStoppage", False)
             self.timesteps_stoppages += locals_dict["info"].get("TimeStepsStoppage", False)
-            self.duration_stoppages += locals_dict["info"].get("DurationStoppage", False())
+            self.duration_stoppages += locals_dict["info"].get("DurationStoppage", False)
             self.final_FWHM.append(locals_dict["info"].get("current FWHM (ps)", 0))
             self.final_Intensity.append(locals_dict["info"].get("current Peak Intensity (TW/m^2)", 0))
             self.episode_lens.append(locals_dict["info"]["episode"]["l"])
