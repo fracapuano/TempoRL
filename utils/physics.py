@@ -215,7 +215,7 @@ def buildup(time:torch.TensorType, intensity:torch.TensorType, return_instants=F
     else: 
         return buildup_duration
 
-def peak_intensity(pulse_intensity:torch.TensorType, w0:float=12e-3, E:float=220e-3, dt:float=4.67e-14) -> float: 
+def peak_intensity(pulse_intensity:torch.TensorType, w0:float=12e-3, E:float=220e-3, dt:float=7.3386e-14) -> float: 
     """
     This function computes the peak intensity given a pulse shape in the 0-1 range and parameters of the energy.
     
@@ -223,7 +223,7 @@ def peak_intensity(pulse_intensity:torch.TensorType, w0:float=12e-3, E:float=220
         pulse_intensity (np.array): array of intensities in a different range from the actual one given the arbitrary units of the intensity values.
         w0 (float, optional): beam radius of the beam (given in SI units), defaults to 12mm for L1 pump. Defaults to 12 mm. 
         E (float, optional): beam energy (given in SI units), defaults to 220 mJ for L1 pump. Defaults to 220 mJ.
-        dt (float, optional): distance in time domain between sample points to approximate the intensity integral. Defaults to 4.67e-14 (s) for 33k elements time profile. 
+        dt (float, optional): distance in time domain between sample points to approximate the intensity integral. Defaults to 7.3386e-14 (s) for 35k elements time profile. 
     
     Returns: 
         float: peak intensity value.
