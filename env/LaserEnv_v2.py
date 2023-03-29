@@ -234,7 +234,7 @@ class LaserEnv_v2(Abstract_BaseLaser):
         # reward coefficients
         coeff_healthy, coeff_intensity = self.coeffs
 
-        return (coeff_healthy * healthy_reward)**2 + coeff_intensity * intensity_reward - self.pulse_FWHM
+        return (0.1 * coeff_healthy * healthy_reward)**2 + coeff_intensity * intensity_reward - 0.1 * self.pulse_FWHM
 
     def step(self, action:torch.TensorType):
         """
@@ -285,7 +285,7 @@ class LaserEnv_v2(Abstract_BaseLaser):
         
         energy_info = 'L1Loss: {:.4f}\n'.format(self.transform_limited_regret())+\
                       'FWHM (ps): {:2.2f}\n'.format(self._get_info()["current FWHM (ps)"])+\
-                      'PI (W/m^2): {:2.2e}'.format(self._get_info()["current Peak Intensity"])
+                      'PI (TW/m^2): {:2.2e}'.format(self._get_info()["current Peak Intensity (TW/m^2)"])
         
         props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.5)
         ax.text(0.7, 0.95, control_info, transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=props)
