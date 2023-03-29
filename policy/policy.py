@@ -128,20 +128,20 @@ class Policy:
             std_reward_best = std_reward_best if std_reward_best > 0 else 1e-6
 
             # comparing std-scaled average rewards over n_episodes
-            final_better_than_last = (reward_final / std_reward_final) > (reward_best / std_reward_best)
+            final_better_than_last = reward_final > reward_best
             
             if final_better_than_last: 
-                best_policy = self.state_dict()
+                self.model.save(os.path.join(best_model_save_path, "best_model.zip"))
                 best_mean_reward, best_std_reward = reward_final, std_reward_final
                 which_one = 'final'
             else:
-                best_policy = best_model.policy.state_dict()
+                # discaring the final model, best is better
                 best_mean_reward, best_std_reward = reward_best, std_reward_best
                 which_one = 'best'
 
             info = {'which_one': which_one}
 
-            return best_mean_reward, best_std_reward, best_policy, info
+            return best_mean_reward, best_std_reward, info
         else:
             return self.eval(n_eval_episodes)
 
