@@ -157,7 +157,7 @@ class LaserEnv_v2(Abstract_BaseLaser):
             "current_control": self._observation,
             "current_control (SI)": self._observation_SI,
             "current FWHM (ps)": self.pulse_FWHM,
-            "current Peak Intensity": self.peak_intensity,
+            "current Peak Intensity (TW/m^2)": self.peak_intensity * 1e-12,
             "L1Loss": self.transform_limited_regret(),
             "DurationStoppage": self.DurationStoppage,
             "TimeStepsStoppage": self.TimeStepsStoppage,
@@ -234,7 +234,7 @@ class LaserEnv_v2(Abstract_BaseLaser):
         # reward coefficients
         coeff_healthy, coeff_intensity = self.coeffs
 
-        return coeff_healthy * healthy_reward + coeff_intensity * intensity_reward
+        return (coeff_healthy * healthy_reward)**2 + coeff_intensity * intensity_reward
 
     def step(self, action:torch.TensorType):
         """
