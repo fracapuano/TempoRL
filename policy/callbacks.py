@@ -173,10 +173,10 @@ class IntensityTrainingCallback(BaseCallback):
             "Max(Final-FWHM) (ps)": np.max(self.EvaluationStats.final_FWHM),
             "Avg(Final-FWHM) (ps)": np.mean(self.EvaluationStats.final_FWHM),
             "Std(Final-FWHM) (ps)": np.std(self.EvaluationStats.final_FWHM),
-            "Min(Final-PeakIntensity) (TW/m^2)": np.min(self.EvaluationStats.final_Intensity) * 1e-12, 
-            "Max(Final-PeakIntensity) (TW/m^2)": np.max(self.EvaluationStats.final_Intensity) * 1e-12,
-            "Avg(Final-PeakIntensity) (TW/m^2)": np.mean(self.EvaluationStats.final_Intensity) * 1e-12,
-            "Std(Final-PeakIntensity) (TW/m^2)": np.std(self.EvaluationStats.final_Intensity) * 1e-12,
+            "Min(Final-PeakIntensity) (TW/m^2)": np.min(self.EvaluationStats.final_Intensity), 
+            "Max(Final-PeakIntensity) (TW/m^2)": np.max(self.EvaluationStats.final_Intensity),
+            "Avg(Final-PeakIntensity) (TW/m^2)": np.mean(self.EvaluationStats.final_Intensity),
+            "Std(Final-PeakIntensity) (TW/m^2)": np.std(self.EvaluationStats.final_Intensity),
         })
         
         # checks if this model is better than current best. If so, update current best
