@@ -230,11 +230,11 @@ class LaserEnv_v2(Abstract_BaseLaser):
             intensity_reward = self.peak_intensity - self.current_intensity  # rewarding variations of intensity
         else: 
             x = self.peak_intensity / self.TL_intensity # rewarding intensity itself
-            intensity_reward = min(0.1 / (1-x), 5)  # asymptotically rewarding higher intensities
+            intensity_reward = min(0.2 / (1-x), 7)  # asymptotically rewarding higher intensities
         # reward coefficients
         coeff_healthy, coeff_intensity = self.coeffs
 
-        return (0.1 * coeff_healthy * healthy_reward)**2 + coeff_intensity * intensity_reward - 0.1 * self.pulse_FWHM
+        return (0.1 * coeff_healthy * healthy_reward)**2 + coeff_intensity * intensity_reward - (0.1 * self.pulse_FWHM)**2
 
     def step(self, action:torch.TensorType):
         """
