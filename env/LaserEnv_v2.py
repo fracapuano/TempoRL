@@ -234,7 +234,7 @@ class LaserEnv_v2(Abstract_BaseLaser):
         # reward coefficients
         coeff_healthy, coeff_intensity = self.coeffs
 
-        return (0.1 * coeff_healthy * healthy_reward)**2 + coeff_intensity * intensity_reward - (0.1 * self.pulse_FWHM)**2
+        return (0.1 * coeff_healthy * healthy_reward)**2 + coeff_intensity * intensity_reward - self.pulse_FWHM
 
     def step(self, action:torch.TensorType):
         """
