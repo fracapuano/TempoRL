@@ -230,7 +230,7 @@ class LaserEnv_v2(Abstract_BaseLaser):
             intensity_reward = self.peak_intensity - self.current_intensity  # rewarding variations of intensity
         else: 
             x = self.peak_intensity / self.TL_intensity # rewarding intensity itself
-            intensity_reward = min(0.2 / (1-x), 7)  # asymptotically rewarding higher intensities
+            intensity_reward = min((0.1 / (1-x)) - 0.1, 7)  # asymptotically rewarding higher intensities
         # reward coefficients
         coeff_healthy, coeff_intensity = self.coeffs
 
@@ -254,6 +254,9 @@ class LaserEnv_v2(Abstract_BaseLaser):
         reward = self.compute_reward(state=self._observation, action=action)
         done = self.is_done()
         info = self._get_info()
+
+        if self.DurationStoppage: 
+            reward -= 20
         
         return self._observation, reward, done, info
     
