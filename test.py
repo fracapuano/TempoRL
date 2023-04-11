@@ -58,7 +58,10 @@ def main():
         version=env_version, 
         render_mode="human" if render else "rgb_array"
     )
-    
+    # if rendering, increase fps
+    if render: 
+        env.metadata["render_fps"] = 15
+        
     # create policy - loading pretrained model
     policy = Policy(
         algo=algorithm,
