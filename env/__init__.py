@@ -59,8 +59,9 @@ def build_default_env(
 
 def get_default_env(
         version:str="v1",
-        device="cpu",
-        render_mode="rgb_array",
+        device:str="cpu",
+        render_mode:str="rgb_array",
+        init_variance:float=.1,
         **kwargs)->Abstract_BaseLaser:
     """Simply builds an env using default configuration for the environment.
 
@@ -83,6 +84,7 @@ def get_default_env(
         B_integral=B_integral, 
         render_mode=render_mode,
         device=device,
+        init_variance=init_variance,
         # kwargs differentiate between different versions
         env_kwargs=kwargs)
         # wrapping using monitor

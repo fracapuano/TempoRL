@@ -46,17 +46,19 @@ render=args.render
 seed=args.seed
 
 if args.default: 
-    algorithm="PPO"
+    algorithm="SAC"  # best performing algorithm
+    env_version="v2"  # more info
     verbose=1
-    test_episodes=50
+    test_episodes=10
     render=True
-    model_path="models/earthy-jazz-6_models/best_model.zip"
+    model_path="models/v2_SAC_07.zip"  # best performing model
 
 def main(): 
     # build the envs according to spec
     env = get_default_env(
         version=env_version, 
-        render_mode="human" if render else "rgb_array"
+        render_mode="human" if render else "rgb_array", 
+        init_variance=5  # much larger variance than at training time, to showcase generalization
     )
     # if rendering, increase fps
     if render: 
