@@ -1,0 +1,9 @@
+matplotlib
+numpy
+pandas==1.5.2
+rich
+sb3_contrib
+scipy
+stable_baselines3
+torch
+wandb
