@@ -46,7 +46,7 @@ python test.py --help
 ```
 
 # Cite us
-If you use this repository, please cite:
+If you use this repository, please do cite:
 
 ```bash
 @misc{capuano23temporl,
